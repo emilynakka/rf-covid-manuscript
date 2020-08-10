@@ -388,8 +388,6 @@ prom[is.na(prom)] <- ""
 
 kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Promotion Pride", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ```{r prev_diff}
@@ -417,8 +415,6 @@ prev[is.na(prev)] <- ""
 
 kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Prevention Pride", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ### Results Without Controlling for Demographic Covariates
@@ -446,8 +442,6 @@ prom[is.na(prom)] <- ""
 
 kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Promotion Pride (No Demographic Covariates)", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ```{r prev_diff_nocv}
@@ -473,8 +467,6 @@ prev[is.na(prev)] <- ""
 
 kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Prevention Pride (No Demographic Covariates)", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ## Associations Between Post-COVID-19 Regulatory Focus Pride and Behavioral Outcomes
@@ -507,8 +499,6 @@ foodest_open[is.na(foodest_open)] <- ""
 
 kable(foodest_open, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Knowing with Certainty If Food Establishments Are Open or Closed for Dine-In Service", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ```{r salon_open}
@@ -537,8 +527,6 @@ salon_open[is.na(salon_open)] <- ""
 
 kable(salon_open, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Knowing with Certainty If Salons and Barbershops Are Open or Closed for In-Person Service", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ### Already Visited Establishments for In-Person Service
@@ -569,8 +557,6 @@ foodest_been[is.na(foodest_been)] <- ""
 
 kable(foodest_been, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Already Dined at a Food Establishment in the Last 14 Days", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ```{r salon_been}
@@ -599,8 +585,6 @@ salon_been[is.na(salon_been)] <- ""
 
 kable(salon_been, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Already Visited a Salon or Barbershop for In-Person Service in the Last 14 Days", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ### Plan to Visit Establishments for In-Person Service
@@ -631,8 +615,6 @@ foodest_plan[is.na(foodest_plan)] <- ""
 
 kable(foodest_plan, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Planning to Dine at a Food Establishment in the Next 14 Days", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ```{r salon_plan}
@@ -661,8 +643,6 @@ salon_plan[is.na(salon_plan)] <- ""
 
 kable(salon_plan, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Planning to Visit a Salon or Barbershop for In-Person Service in the Next 14 Days", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 ### Usage of Vitamin Supplements for Health and Well-Being
@@ -693,11 +673,9 @@ vitamins_current[is.na(vitamins_current)] <- ""
 
 kable(vitamins_current, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Currently Using Vitamins, Minerals, or Natural Immunity Boosters to Maintain Health and Well-Being", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
-## Purchases Frozen Food
+### Purchases Frozen Food
 
 ```{r frozenfood}
 frozenfood.rf <- glm(frozenfood.d ~ prom + prev + agegroup.num + pol_orient.num, data = rf, family = "binomial")
@@ -725,8 +703,6 @@ frozenfood[is.na(frozenfood)] <- ""
 
 kable(frozenfood, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Purchasing Frozen Food", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
-  # kable_styling(latex_options = c("scale_down")) %>%
-  #footnote(general = "asdf.", general_title = "Note: ", footnote_as_chunk = T, title_format = c("italic"), threeparttable = TRUE)
 ```
 
 \newpage
