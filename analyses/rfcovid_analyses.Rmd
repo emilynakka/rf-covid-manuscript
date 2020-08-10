@@ -1,6 +1,6 @@
 ---
 title             : "Regulatory Focus Pride and COVID-19 (Analysis Code)"
-author            : "Emily Nakkawita, Tamar Avnet, & Namika Sagara"
+author            : "[Author names redacted for blind peer review]"
 output:
   pdf_document:
     toc: true

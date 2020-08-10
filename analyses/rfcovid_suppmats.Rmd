@@ -1,6 +1,6 @@
 ---
 title             : "Regulatory Focus Pride and COVID-19 (Supplementary Material)"
-author            : "Emily Nakkawita, Tamar Avnet, & Namika Sagara"
+author            : "[Author names redacted for blind peer review]"
 output:
   pdf_document:
     toc: true
@@ -349,7 +349,7 @@ stronglylib <- round(nrow(filter(rf_2020, pol_orient == "Strongly Liberal"))/
 
 # Study Materials and Procedure Beyond RFQ and Demographic Questionnaires
 
-As described in the manuscript, the present research involves secondary data analyses of two existing datasets: one that was collected by one of the authors (E.N.) before the COVID-19 pandemic began in December 2019 and a second that was collected by another of the authors (T.A.) in collaboration with Ipsos after the COVID-19 pandemic began in June 2020. Both of these datasets include the Regulatory Focus Questionnaire [RFQ; @higginsetal2001] and demographic items related to age and political orientation. In addition to the key items of interest described in the manuscript, the studies included a range of additional measures unrelated to the present investigation. Please see below for a description of these measures and the study's procedure.
+As described in the manuscript, the present research involves secondary data analyses of two existing datasets: one that was collected by one of the authors ([Redacted]) before the COVID-19 pandemic began in December 2019 and a second that was collected by another of the authors ([Redacted]) in collaboration with Ipsos after the COVID-19 pandemic began in June 2020. Both of these datasets include the Regulatory Focus Questionnaire [RFQ; @higginsetal2001] and demographic items related to age and political orientation. In addition to the key items of interest described in the manuscript, the studies included a range of additional measures unrelated to the present investigation. Please see below for a description of these measures and the study's procedure.
 
 ## 2019 Data (Before COVID-19 Pandemic)
 
