@@ -1,5 +1,5 @@
 ---
-title             : "Regulatory Focus Pride and COVID-19 (Analysis Code)"
+title             : "Regulatory Focus Pride and Covid-19 (Analysis Code)"
 author            : "[Author names redacted for blind peer review]"
 output:
   pdf_document:
@@ -23,13 +23,12 @@ knitr::opts_knit$set(root.dir = normalizePath('../'))
 options(scipen = 999)
 ```
 
-## Load Libraries, Themes, and Functions
+## Load Libraries and Themes
 
 ```{r libs}
 # Load libraries
 library(knitr) # Required for knitting
 library(readxl) # Required to load .xlsx file
-library(plyr) # Required for summarySE() function
 library(tidyverse) # Required for data cleaning
 library(broman) # Required for myround() function that doesn't truncate digits
 library(ggsignif) # Required for plots with significance stars
@@ -52,42 +51,6 @@ mythemeweb = theme_classic(base_size = 13) +
           axis.ticks = element_line(size = .5),
           axis.ticks.length=unit(-2, "mm"))
 theme_set(mythemeweb)
-
-# Define functions
-summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
-                      conf.interval=.95, .drop=TRUE) {
-
-    # New version of length which can handle NA's: if na.rm==T, don't count them
-    length2 <- function (x, na.rm=FALSE) {
-        if (na.rm) sum(!is.na(x))
-        else       length(x)
-    }
-
-    # This does the summary. For each group's data frame, return a vector with
-    # N, mean, and sd
-    datac <- plyr::ddply(data, groupvars, .drop=.drop,
-      .fun = function(xx, col) {
-        c(N    = length2(xx[[col]], na.rm=na.rm),
-          mean = mean   (xx[[col]], na.rm=na.rm),
-          sd   = sd     (xx[[col]], na.rm=na.rm)
-        )
-      },
-      measurevar
-    )
-
-    # Rename the "mean" column    
-    datac <- plyr::rename(datac, c("mean" = measurevar))
-
-    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
-
-    # Confidence interval multiplier for standard error
-    # Calculate t-statistic for confidence interval: 
-    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
-    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
-    datac$ci <- datac$se * ciMult
-
-    return(datac)
-}
 ```
 
 ## Load and Clean Data
@@ -96,6 +59,7 @@ summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
 # IMPORT DATA
 rf_2019 <- read.csv(file="data/RFQ_Dec2019.csv", header = TRUE)
 rf_2020 <- read_excel("data/RAW DATA BeSci Analytic Engine without zipcode.xlsx", col_names = TRUE)
+rf_2020b <- read_excel("data/Mindset Survey 1 Data 2020-08-13 Definitions TDJ.xlsx", col_names = TRUE)
 
 ## PREPARE DATA FOR CLEANING AND ANALYSIS
 
@@ -105,7 +69,7 @@ rf_2019 <- rf_2019[,3:24]
 # Rename location column
 rf_2019 <- dplyr::rename(rf_2019, state = location)
 
-# Remove second header line in 2020 data, then rename and grab numeric scores from columns
+# Remove second header line in 2020 Study 1 data, then rename and grab numeric scores from RFQ columns
 rf_2020 <- rf_2020 %>%
   dplyr::filter(RESP_GENDER != "Gender") %>%
   dplyr::rename(gender = RESP_GENDER,
@@ -172,12 +136,167 @@ rf_2020$rfq_11 <- str_extract(rf_2020$rfq_11, "^.{1}")
 
 rf_2020$state <- str_sub(rf_2020$state, start= -2)
 
-# Convert RFQ columns to numeric in rf_2020
-num <- c("rfq_1", "rfq_2", "rfq_3", "rfq_4", "rfq_5", "rfq_6", 
-         "rfq_7", "rfq_8", "rfq_9", "rfq_10", "rfq_11") # Define numeric columns
-rf_2020[num] <- lapply(rf_2020[num], as.character) # Convert numeric columns to character (before numeric) to prevent values from changing
-rf_2020[num] <- lapply(rf_2020[num], as.numeric) # Convert numeric columns to numeric
-rm(num) # Clear mfraw.num from workspace as it is no longer needed
+# Do the same for 2020 Study 2 data
+rf_2020b <- rf_2020b %>%
+  dplyr::filter(RESP_GENDER != "Gender") %>%
+  dplyr::rename(gender = RESP_GENDER,
+                state = SCREENER1,
+                travel_car = "Q2032311582 (Gone on a roadtrip in a car)",
+                travel_air = "Q2032311582 (Traveled by airplane)",
+                travel_pubtrans = "Q2032311582 (Taken local public transportation (eg bus subwa",
+                travel_rideshare = "Q2032311582 (Taken ridesharing services (eg Uber Lyft))",
+                travel_taxi = "Q2032311582 (Taken a taxi)",
+                stay_hotel = "Q2032311582 (Stayed in a hotel)",
+                stay_rental = "Q2032311582 (Stayed in a vacation rental (eg Airbnb))",
+                travel_car_l = "Q2040372016 (Go on a roadtrip in a car)",
+                travel_air_l = "Q2040372016 (Travel by airplane)",
+                travel_pubtrans_l = "Q2040372016 (Take local public transportation (eg bus subway",
+                travel_rideshare_l = "Q2040372016 (Take ridesharing services (eg Uber Lyft))",
+                travel_taxi_l = "Q2040372016 (Take a taxi)",
+                stay_hotel_l = "Q2040372016 (Stay in a hotel)",
+                stay_rental_l = "Q2040372016 (Stay in a vacation rental (eg Airbnb))",
+                out_restaurant = "Q2038689152 (Gone out to a restaurant with friends/family)",
+                out_publicevent = "Q2038689152 (Gone out to an event in public with friends/fam",
+                out_bar = "Q2038689152 (Gone out to a bar with friends/family)",
+                out_largegathering = "Q2038689152 (Gone out to a large gathering (eg more than 10",
+                drank_home = "Q2038689152 (Drank alcoholic beverages at home)",
+                online_gathering = "Q2038689152 (Participated in an online social gathering (eg",
+                out_restaurant_l = "Q2027016490 (Go out to a restaurant with friends/family)",
+                out_publicevent_l = "Q2027016490 (Go out to an event in public with friends/famil",
+                out_bar_l = "Q2027016490 (Go out to a bar with friends/family)",
+                out_largegathering_l = "Q2027016490 (Go out to a large gathering (eg more than 10 pe",
+                drink_home_l = "Q2027016490 (Drink alcoholic beverages at home)",
+                online_gathering_l = "Q2027016490 (Participate in an online social gathering (eg Z",
+                shop_mall = "Q2007850037 (Gone to a shopping mall)",
+                shop_grocery = "Q2007850037 (Gone to a grocery store)",
+                order_grocery_delivery = "Q2007850037 (Ordered groceries online for delivery)",
+                order_grocery_pickup = "Q2007850037 (Ordered groceries online for pickup)",
+                new_prod_brand = "Q2007850037 (Tried a new product or brand for the first time",
+                shop_nonessential_instore = "Q2007850037 (Shopped for non-essential items in a store)",
+                shop_nonessential_online = "Q2007850037 (Shopped for non-essential items online)",
+                shop_mall_l = "Q2074949376 (Go to a shopping mall)",
+                shop_grocery_l = "Q2074949376 (Go to a grocery store)",
+                order_grocery_delivery_l = "Q2074949376 (Order groceries online for delivery)",
+                order_grocery_pickup_l = "Q2074949376 (Order groceries online for pickup)",
+                new_prod_brand_l = "Q2074949376 (Try a new product or brand for the first time)",
+                shop_nonessential_instore_l = "Q2074949376 (Shop for non-essential items in a store)",
+                shop_nonessential_online_l = "Q2074949376 (Shop for non-essential items online)",
+                wash_hands_sanitizer = "Q2094454301 (I always wash hands or use hand sanitizer as so",
+                wear_mask_self_family = "Q2094454301 (I wear masks whenever I leave my house to prote",
+                wear_mask_others = "Q2094454301b (I wear masks whenever I leave my house to prote",
+                wear_gloves = "Q2094454301 (I wear gloves whenever I leave my house)",
+                social_distancing = "Q2094454301 (I practice social distancing whenever I leave m",
+                avoid_places_no_socdist = "Q2094454301 (I avoid going to places that do not enforce soc",
+                clean_disinfect = "Q2094454301 (I regularly clean and disinfect my home)",
+                tested_covid = "Q2019985903 (Have you been tested for Covid-19 (or antibodie",
+                tested_covid_plan = "Q2019985903 (Do you plan to get tested for Covid-19 (or anti",
+                covid_threat_personal = "Q2040189607 (What level of threat do you think Covid-19 pose",
+                covid_threat_peers = "Q2040189607 (What level of threat do you think Covid-19 pose2",
+                life_return_normal = "Q2005528889",
+                rfq_1 = "Q2014987959 (Compared to most people are you typically unabl",
+                rfq_2 = "Q2014987959 (Do you often do well at different things that y",
+                rfq_3 = "Q2014987959 (Not being careful enough has gotten me into tro",
+                rfq_4 = "Q2014987959 (Growing up did you ever act in ways that your p",
+                rfq_5 = "Q2014987959 (Did you get on your parents’ nerves often when",
+                rfq_6 = "Q2014987959 (Growing up would you ever “cross the line” by d",
+                rfq_7 = "Q2011014226 (I feel like I have made progress toward being s",
+                rfq_8 = "Q2011014226 (I have found very few hobbies or activities in",
+                rfq_9 = "Q2076338533",
+                rfq_10 = "Q2058289486",
+                rfq_11 = "Q2031600708",
+                ach_pos_outcomes = "Q2087337059 (I tend to focus on achieving positive outcomes)",
+                avoid_neg_cons = "Q2087337059 (I tend to focus on avoiding negative consequenc",
+                ach_new_exps = "Q2087337059 (I tend to focus on achieving new experiences)",
+                duties_oblig = "Q2087337059 (I tend to focus on my duties and obligations)",
+                get_to_do = "Q2087337059 (I tend to focus on things I get to do)",
+                have_to_do = "Q2087337059 (I tend to focus on things I have to do)",
+                proper_behavior = "Q2016440512 (It is my feeling that if everyone else in a gro",
+                avoid_outofstyle = "Q2016440512 (I actively avoid wearing clothes that are not i",
+                parties_fit_in = "Q2016440512 (At parties I usually try to behave in a manner",
+                uncertain_look_to_others = "Q2016440512 (When I am uncertain how to act in a social situ",
+                avoid_outofplace = "Q2016440512 (I try to pay attention to the reactions of othe",
+                slang = "Q2016440512 (I find that I tend to pick up slang expressions",
+                what_others_wear = "Q2016440512 (I tend to pay attention to what others are wear",
+                disapproval_change = "Q2090610647 (The slightest look of disapproval in the eyes o",
+                imp_fit_in = "Q2090610647 (Its important to me to fit into the group Im wi",
+                beh_depends_on_others = "Q2090610647 (My behavior often depends on how I feel others",
+                uncertain_look_to_others2 = "Q2090610647 (If I am the least bit uncertain as to how to ac",
+                keep_up_clothing = "Q2090610647 (I usually keep up with clothing style changes b",
+                not_follow_crowd = "Q2090610647 (When in a social situation I tend not to follow",
+                risks_fun = "Q2017707446 (Taking risks makes life more fun)",
+                risk_taker = "Q2017707446 (My friends would say that Im a risk taker)",
+                enjoy_risk = "Q2017707446 (I enjoy taking risks in most aspects of my life",
+                risk_even_if_hurt = "Q2017707446 (I would take a risk even if it meant I might ge",
+                risks_imp = "Q2017707446 (Taking risks is an important part of my life)",
+                common_risky_dec = "Q2017707446 (I commonly make risky decisions)",
+                believe_taking_chances = "Q2017707446 (I am a believer of taking chances)",
+                attracted_by_risk = "Q2017707446 (I am attracted rather than scared by risk)",
+                people_listen = "Q2060172177 (I can get people to listen to what I say)",
+                wishes_dont_carry_weight = "Q2060172177 (My wishes do not carry much weight)",
+                get_others_todo = "Q2060172177 (I can get others to do what I want)",
+                views_little_sway = "Q2060172177 (Even if I voice them my views have little sway)",
+                have_power = "Q2060172177 (I think I have a great deal of power)",
+                ideas_op_ignored = "Q2060172177 (My ideas and opinions are often ignored)",
+                unable_get_way = "Q2060172177 (Even when I try I am not able to get my way)",
+                make_decisions = "Q2060172177 (If I want to I get to make the decisions)",
+                age = "Q2022382998",
+                ethnicity = "Q2038877242",
+                pol_orient = "Q2058714381",
+                education = "Q2066913167",
+                income = "Q2035596434")
+rf_2020b$rfq_1 <- str_extract(rf_2020b$rfq_1, "^.{1}")
+rf_2020b$rfq_2 <- str_extract(rf_2020b$rfq_2, "^.{1}")
+rf_2020b$rfq_3 <- str_extract(rf_2020b$rfq_3, "^.{1}")
+rf_2020b$rfq_4 <- str_extract(rf_2020b$rfq_4, "^.{1}")
+rf_2020b$rfq_5 <- str_extract(rf_2020b$rfq_5, "^.{1}")
+rf_2020b$rfq_6 <- str_extract(rf_2020b$rfq_6, "^.{1}")
+rf_2020b$rfq_7 <- str_extract(rf_2020b$rfq_7, "^.{1}")
+rf_2020b$rfq_8 <- str_extract(rf_2020b$rfq_8, "^.{1}")
+rf_2020b$rfq_9 <- str_extract(rf_2020b$rfq_9, "^.{1}")
+rf_2020b$rfq_10 <- str_extract(rf_2020b$rfq_10, "^.{1}")
+rf_2020b$rfq_11 <- str_extract(rf_2020b$rfq_11, "^.{1}")
+
+# Grab text labels for demographic columns
+rf_2020b$ethnicity <- str_sub(rf_2020b$ethnicity, start = 5)
+rf_2020b$pol_orient <- str_sub(rf_2020b$pol_orient, start = 5)
+rf_2020b$education <- str_sub(rf_2020b$education, start = 5)
+rf_2020b$income <- str_sub(rf_2020b$income, start = 5)
+
+# Recode demographics in 2020 Study 2 data to match 2020 Study 1 coding
+rf_2020b$pol_orient <- case_when(rf_2020b$pol_orient == "Very conservative" ~ "Strongly Conservative",
+                            rf_2020b$pol_orient == "Very liberal" ~ "Strongly Liberal",
+                            rf_2020b$pol_orient == "Conservative" ~ "Conservative",
+                            rf_2020b$pol_orient == "Liberal" ~ "Liberal",
+                            rf_2020b$pol_orient == "Slightly conservative" ~ "Slightly Conservative",
+                            rf_2020b$pol_orient == "Slightly liberal" ~ "Slightly Liberal",
+                            rf_2020b$pol_orient == "Moderate" ~ "Moderate")
+rf_2020b$agegroup <- case_when(rf_2020b$age < 25 ~ "18 - 24",
+                              rf_2020b$age < 35 ~ "25 - 34",
+                              rf_2020b$age < 45 ~ "35 - 44",
+                              rf_2020b$age < 55 ~ "45 - 54",
+                              rf_2020b$age < 65 ~ "55 - 64",
+                              rf_2020b$age >= 65 ~ "65 or older")
+rf_2020b$education <- case_when(rf_2020b$education == "Elementary School" ~ "Other",
+                            rf_2020b$education == "Some High School" ~ "Other",
+                            rf_2020b$education == "High School Graduate or GED" ~ "High School Diploma",
+                            rf_2020b$education == "Some College" ~ "High School Diploma",
+                            rf_2020b$education == "Associate Degree" ~ "Associates Degree",
+                            rf_2020b$education == "Bachelor’s Degree" ~ "Bachelors Degree",
+                            rf_2020b$education == "Master’s Degree" ~ "Graduate Degree",
+                            rf_2020b$education == "MD, JD, PhD" ~ "Graduate Degree")
+rf_2020b$income <- case_when(rf_2020b$income == "$0-$10,000" ~ "$0 - $10,000",
+                            rf_2020b$income == "$10,001 - $20,000" ~ "$10,000 - $20,000",
+                            rf_2020b$income == "$20,001 - $40,000" ~ "$20,001 - $40,000",
+                            rf_2020b$income == "$40,001 - $70,000" ~ "$40,001 - $70,000",
+                            rf_2020b$income == "$70,001 - $100,000" ~ "$70,001 - $100,000",
+                            rf_2020b$income == "$100,001 - $250,000" ~ "$100,001 - $250,000",
+                            rf_2020b$income == "$250,001+" ~ "$250,001+")
+
+# Add study month columns and then merge dataframes
+rf_2020$month <- "Jun"
+rf_2020b$month <- "July"
+rf_2020 <- merge(rf_2020, rf_2020b, all = T)
+rm(rf_2020b)
 
 # Calculate agegroup in 2019 data (consistent with 2020 age group levels)
 rf_2019$agegroup <- case_when(rf_2019$age < 25 ~ "18 - 24",
@@ -211,9 +330,16 @@ rf_2019$pol_orient <- case_when(rf_2019$pol_orient == "Very Conservative" ~ "Str
                             rf_2019$pol_orient == "Slightly Liberal" ~ "Slightly Liberal",
                             rf_2019$pol_orient == "Moderate" ~ "Moderate")
 
-# Add study year columns and then merge dataframes
-rf_2019$year <- "2019"
-rf_2020$year <- "2020"
+# Convert RFQ columns to numeric in rf_2020
+num <- c("rfq_1", "rfq_2", "rfq_3", "rfq_4", "rfq_5", "rfq_6", 
+         "rfq_7", "rfq_8", "rfq_9", "rfq_10", "rfq_11") # Define numeric columns
+rf_2020[num] <- lapply(rf_2020[num], as.character) # Convert numeric columns to character (before numeric) to prevent values from changing
+rf_2020[num] <- lapply(rf_2020[num], as.numeric) # Convert numeric columns to numeric
+rm(num) # Clear mfraw.num from workspace as it is no longer needed
+
+# Add pre vs. post Covid column and then merge dataframes
+rf_2019$covid <- "Pre-Covid"
+rf_2020$covid <- "Post-Covid"
 rf <- bind_rows(rf_2019, rf_2020)
 rm(rf_2019, rf_2020)
 
@@ -226,23 +352,29 @@ rf$prom <- ((6-rf$rfq_1) + rf$rfq_3 + rf$rfq_7 + (6-rf$rfq_9) +
 # Calculate promotion dominance scores
 rf$promdom <- rf$prom - rf$prev
 
-# Dummy-code year
-rf$year.d <- NA
-rf$year.d[rf$year == 2019] <- 0
-rf$year.d[rf$year == 2020] <- 1
+# Dummy-code pre vs. post Covid
+rf$covid.d <- NA
+rf$covid.d[rf$covid == "Pre-Covid"] <- 0
+rf$covid.d[rf$covid == "Post-Covid"] <- 1
 
-# Create an ordinal numeric version of the political orientation variable
-rf$pol_orient.num <- recode(rf$pol_orient, `Strongly Conservative` = 1, 
+# Create ordered factor version of Covid variable for plotting
+rf$covidF <- factor(rf$covid, levels = c("Pre-Covid", "Post-Covid"), ordered = TRUE)
+
+# Create an ordinal numeric version of the political orientation variable and mean-center
+rf$pol_orient.num <- dplyr::recode(rf$pol_orient, `Strongly Conservative` = 1, 
                             `Conservative` = 2, `Slightly Conservative` = 3, 
                             `Moderate` = 4, `Slightly Liberal` = 5, 
                             `Liberal` = 6, `Strongly Liberal` = 7, .default = NA_real_)
+rf$pol_orient.num.c <- as.numeric(scale(rf$pol_orient.num, center = TRUE, scale = FALSE))
 
-# Create an ordinal numeric version of the age group variable
-rf$agegroup.num <- recode(rf$agegroup, `18 - 24` = 1, `25 - 34` = 2, 
+# Create an ordinal numeric version of the age group variable and mean-center
+rf$agegroup.num <- dplyr::recode(rf$agegroup, `18 - 24` = 1, `25 - 34` = 2, 
                           `35 - 44` = 3, `45 - 54` = 4, `55 - 64` = 5, 
                           `65 or older` = 6, .default = NA_real_)
+rf$agegroup.num.c <- as.numeric(scale(rf$agegroup.num, center = TRUE, scale = FALSE))
 
-# Dummy-code behavioral outcome variables
+## DUMMY-CODE BEHAVIORAL OUTCOME VARIABLES (2020 Study 1)
+
 rf$foodest_open_certain.d <- case_when(rf$foodest_open == "Yes" ~ 1,
                                rf$foodest_open == "Uncertain" ~ 0,
                                rf$foodest_open == "No" ~ 1)
@@ -265,18 +397,192 @@ rf$vitamins_current.d <- case_when(rf$vitamins == "Currently using" ~ 1,
 rf$frozenfood.d <- case_when(rf$frozenfood == "Yes" ~ 1,
                              rf$frozenfood == "No" ~ 0)
 
-# Create subsets where needed for analyses
+# Create Study 1 subsets where needed for analyses
 foodest <- filter(rf, foodest_open == "Yes" | foodest_open == "Uncertain") # n = 365
 salon <- filter(rf, salon_open == "Yes" | salon_open == "Uncertain") # n = 412
 
-# Subset 2019 and 2020
-rf_2019 <- dplyr::filter(rf, year == 2019)
-rf_2020 <- dplyr::filter(rf, year == 2020)
+
+## EXTRACT NUMERIC DATA FOR BEHAVIORAL OUTCOME VARIABLES (2020 Study 2)
+
+# 1 = yes, 2 = no
+rf$travel_car <- str_to_title(str_sub(rf$travel_car, start = 5))
+rf$travel_air <- str_to_title(str_sub(rf$travel_air, start = 5))
+rf$travel_pubtrans <- str_to_title(str_sub(rf$travel_pubtrans, start = 5))
+rf$travel_rideshare <- str_to_title(str_sub(rf$travel_rideshare, start = 5))
+rf$travel_taxi <- str_to_title(str_sub(rf$travel_taxi, start = 5))
+rf$stay_hotel <- str_to_title(str_sub(rf$stay_hotel, start = 5))
+rf$stay_rental <- str_to_title(str_sub(rf$stay_rental, start = 5))
+rf$out_restaurant <- str_to_title(str_sub(rf$out_restaurant, start = 5))
+rf$out_publicevent <- str_to_title(str_sub(rf$out_publicevent, start = 5))
+rf$out_bar <- str_to_title(str_sub(rf$out_bar, start = 5))
+rf$out_largegathering <- str_to_title(str_sub(rf$out_largegathering, start = 5))
+rf$drank_home <- str_to_title(str_sub(rf$drank_home, start = 5))
+rf$online_gathering <- str_to_title(str_sub(rf$online_gathering, start = 5))
+rf$shop_mall <- str_to_title(str_sub(rf$shop_mall, start = 5))
+rf$shop_grocery <- str_to_title(str_sub(rf$shop_grocery, start = 5))
+rf$order_grocery_delivery <- str_to_title(str_sub(rf$order_grocery_delivery, start = 5))
+rf$order_grocery_pickup <- str_to_title(str_sub(rf$order_grocery_pickup, start = 5))
+rf$new_prod_brand <- str_to_title(str_sub(rf$new_prod_brand, start = 5))
+rf$shop_nonessential_instore <- str_to_title(str_sub(rf$shop_nonessential_instore, start = 5))
+rf$shop_nonessential_online <- str_to_title(str_sub(rf$shop_nonessential_online, start = 5))
+rf$tested_covid <- str_to_title(str_sub(rf$tested_covid, start = 5))
+rf$tested_covid_plan <- str_to_title(str_sub(rf$tested_covid_plan, start = 5))
+
+# 1 = very unlikely, 7 = very likely
+rf$travel_car_l <- str_extract(rf$travel_car_l, "^.{1}")
+rf$travel_air_l <- str_extract(rf$travel_air_l, "^.{1}")
+rf$travel_pubtrans_l <- str_extract(rf$travel_pubtrans_l, "^.{1}")
+rf$travel_rideshare_l <- str_extract(rf$travel_rideshare_l, "^.{1}")
+rf$travel_taxi_l <- str_extract(rf$travel_taxi_l, "^.{1}")
+rf$stay_hotel_l <- str_extract(rf$stay_hotel_l, "^.{1}")
+rf$stay_rental_l <- str_extract(rf$stay_rental_l, "^.{1}")
+rf$out_restaurant_l <- str_extract(rf$out_restaurant_l, "^.{1}")
+rf$out_publicevent_l <- str_extract(rf$out_publicevent_l, "^.{1}")
+rf$out_bar_l <- str_extract(rf$out_bar_l, "^.{1}")
+rf$out_largegathering_l <- str_extract(rf$out_largegathering_l, "^.{1}")
+rf$drink_home_l <- str_extract(rf$drink_home_l, "^.{1}")
+rf$online_gathering_l <- str_extract(rf$online_gathering_l, "^.{1}")
+rf$shop_mall_l <- str_extract(rf$shop_mall_l, "^.{1}")
+rf$shop_grocery_l <- str_extract(rf$shop_grocery_l, "^.{1}")
+rf$order_grocery_delivery_l <- str_extract(rf$order_grocery_delivery_l, "^.{1}")
+rf$order_grocery_pickup_l <- str_extract(rf$order_grocery_pickup_l, "^.{1}")
+rf$new_prod_brand_l <- str_extract(rf$new_prod_brand_l, "^.{1}")
+rf$shop_nonessential_instore_l <- str_extract(rf$shop_nonessential_instore_l, "^.{1}")
+rf$shop_nonessential_online_l <- str_extract(rf$shop_nonessential_online_l, "^.{1}")
+
+# 1 = strongly disagree, 7 = strongly agree
+rf$wash_hands_sanitizer <- str_extract(rf$wash_hands_sanitizer, "^.{1}")
+rf$wear_mask_self_family <- str_extract(rf$wear_mask_self_family, "^.{1}")
+rf$wear_mask_others <- str_extract(rf$wear_mask_others, "^.{1}")
+rf$wear_gloves <- str_extract(rf$wear_gloves, "^.{1}")
+rf$social_distancing <- str_extract(rf$social_distancing, "^.{1}")
+rf$avoid_places_no_socdist <- str_extract(rf$avoid_places_no_socdist, "^.{1}")
+rf$clean_disinfect <- str_extract(rf$clean_disinfect, "^.{1}")
+rf$risks_fun <- str_extract(rf$risks_fun, "^.{1}")
+rf$risk_taker <- str_extract(rf$risk_taker, "^.{1}")
+rf$enjoy_risk <- str_extract(rf$enjoy_risk, "^.{1}")
+rf$risk_even_if_hurt <- str_extract(rf$risk_even_if_hurt, "^.{1}")
+rf$risks_imp <- str_extract(rf$risks_imp, "^.{1}")
+rf$common_risky_dec <- str_extract(rf$common_risky_dec, "^.{1}")
+rf$believe_taking_chances <- str_extract(rf$believe_taking_chances, "^.{1}")
+rf$attracted_by_risk <- str_extract(rf$attracted_by_risk, "^.{1}")
+rf$people_listen <- str_extract(rf$people_listen, "^.{1}")
+rf$wishes_dont_carry_weight <- str_extract(rf$wishes_dont_carry_weight, "^.{1}")
+rf$get_others_todo <- str_extract(rf$get_others_todo, "^.{1}")
+rf$views_little_sway <- str_extract(rf$views_little_sway, "^.{1}")
+rf$have_power <- str_extract(rf$have_power, "^.{1}")
+rf$ideas_op_ignored <- str_extract(rf$ideas_op_ignored, "^.{1}")
+rf$unable_get_way <- str_extract(rf$unable_get_way, "^.{1}")
+rf$make_decisions <- str_extract(rf$make_decisions, "^.{1}")
+
+# 1 = very low threat, 7 = very high threat
+rf$covid_threat_personal <- str_extract(rf$covid_threat_personal, "^.{1}")
+rf$covid_threat_peers <- str_extract(rf$covid_threat_peers, "^.{1}")
+
+rf$state <- str_sub(rf$state, start= -2)
+
+# 1 = strongly disagree, 5 = strongly agree
+rf$ach_pos_outcomes <- str_extract(rf$ach_pos_outcomes, "^.{1}")
+rf$avoid_neg_cons <- str_extract(rf$avoid_neg_cons, "^.{1}")
+rf$ach_new_exps <- str_extract(rf$ach_new_exps, "^.{1}")
+rf$duties_oblig <- str_extract(rf$duties_oblig, "^.{1}")
+rf$get_to_do <- str_extract(rf$get_to_do, "^.{1}")
+rf$have_to_do <- str_extract(rf$have_to_do, "^.{1}")
+
+# 1 = always false, 7 = always true
+rf$proper_behavior <- str_extract(rf$proper_behavior, "^.{1}")
+rf$avoid_outofstyle <- str_extract(rf$avoid_outofstyle, "^.{1}")
+rf$parties_fit_in <- str_extract(rf$parties_fit_in, "^.{1}")
+rf$uncertain_look_to_others <- str_extract(rf$uncertain_look_to_others, "^.{1}")
+rf$avoid_outofplace <- str_extract(rf$avoid_outofplace, "^.{1}")
+rf$slang <- str_extract(rf$slang, "^.{1}")
+rf$what_others_wear <- str_extract(rf$what_others_wear, "^.{1}")
+rf$disapproval_change <- str_extract(rf$disapproval_change, "^.{1}")
+rf$imp_fit_in <- str_extract(rf$imp_fit_in, "^.{1}")
+rf$beh_depends_on_others <- str_extract(rf$beh_depends_on_others, "^.{1}")
+rf$uncertain_look_to_others2 <- str_extract(rf$uncertain_look_to_others2, "^.{1}")
+rf$keep_up_clothing <- str_extract(rf$keep_up_clothing, "^.{1}")
+rf$not_follow_crowd <- str_extract(rf$not_follow_crowd, "^.{1}")
+
+# Recode life_return_normal columns
+rf$life_return_normal <- case_when(rf$life_return_normal == "It has already been contained" ~ 1,
+                             rf$life_return_normal == "1-2 months from now" ~ 2,
+                             rf$life_return_normal == "3-5 months from now" ~ 3,
+                             rf$life_return_normal == "6-8 months from now " ~ 4,
+                             rf$life_return_normal == "9-12 months from now" ~ 5,
+                             rf$life_return_normal == "More than 12 months from now" ~ 6)
+
+# Dummy-code 2020 Study 2 behavioral outcome variables
+rf$travel_car.d <- case_when(rf$travel_car == "Yes" ~ 1,
+                             rf$travel_car == "No" ~ 0)
+rf$travel_air.d <- case_when(rf$travel_air == "Yes" ~ 1,
+                             rf$travel_air == "No" ~ 0)
+rf$travel_pubtrans.d <- case_when(rf$travel_pubtrans == "Yes" ~ 1,
+                             rf$travel_pubtrans == "No" ~ 0)
+rf$travel_rideshare.d <- case_when(rf$travel_rideshare == "Yes" ~ 1,
+                             rf$travel_rideshare == "No" ~ 0)
+rf$travel_taxi.d <- case_when(rf$travel_taxi == "Yes" ~ 1,
+                             rf$travel_taxi == "No" ~ 0)
+rf$stay_hotel.d <- case_when(rf$stay_hotel == "Yes" ~ 1,
+                             rf$stay_hotel == "No" ~ 0)
+rf$stay_rental.d <- case_when(rf$stay_rental == "Yes" ~ 1,
+                             rf$stay_rental == "No" ~ 0)
+rf$out_restaurant.d <- case_when(rf$out_restaurant == "Yes" ~ 1,
+                             rf$out_restaurant == "No" ~ 0)
+rf$out_publicevent.d <- case_when(rf$out_publicevent == "Yes" ~ 1,
+                             rf$out_publicevent == "No" ~ 0)
+rf$out_bar.d <- case_when(rf$out_bar == "Yes" ~ 1,
+                             rf$out_bar == "No" ~ 0)
+rf$out_largegathering.d <- case_when(rf$out_largegathering == "Yes" ~ 1,
+                             rf$out_largegathering == "No" ~ 0)
+rf$drank_home.d <- case_when(rf$drank_home == "Yes" ~ 1,
+                             rf$drank_home == "No" ~ 0)
+rf$online_gathering.d <- case_when(rf$online_gathering == "Yes" ~ 1,
+                             rf$online_gathering == "No" ~ 0)
+rf$shop_mall.d <- case_when(rf$shop_mall == "Yes" ~ 1,
+                             rf$shop_mall == "No" ~ 0)
+rf$shop_grocery.d <- case_when(rf$shop_grocery == "Yes" ~ 1,
+                             rf$shop_grocery == "No" ~ 0)
+rf$order_grocery_delivery.d <- case_when(rf$order_grocery_delivery == "Yes" ~ 1,
+                             rf$order_grocery_delivery == "No" ~ 0)
+rf$order_grocery_pickup.d <- case_when(rf$order_grocery_pickup == "Yes" ~ 1,
+                             rf$order_grocery_pickup == "No" ~ 0)
+rf$new_prod_brand.d <- case_when(rf$new_prod_brand == "Yes" ~ 1,
+                             rf$new_prod_brand == "No" ~ 0)
+rf$shop_nonessential_instore.d <- case_when(rf$shop_nonessential_instore == "Yes" ~ 1,
+                             rf$shop_nonessential_instore == "No" ~ 0)
+rf$shop_nonessential_online.d <- case_when(rf$shop_nonessential_online == "Yes" ~ 1,
+                             rf$shop_nonessential_online == "No" ~ 0)
+rf$tested_covid.d <- case_when(rf$tested_covid == "Yes" ~ 1,
+                             rf$tested_covid == "No" ~ 0)
+rf$tested_covid_plan.d <- case_when(rf$tested_covid_plan == "Yes" ~ 1,
+                             rf$tested_covid_plan == "No" ~ 0)
+
+# Create numeric month variable
+rf$month.num[rf$covid == "Pre-Covid"] <- 1 # December 2019
+rf$month.num[rf$covid == "Post-Covid" & rf$month == "Jun"] <- 7 # June 2020
+rf$month.num[rf$covid == "Post-Covid" & rf$month == "July"] <- 8 # July 2020
+
+# Make character month variable an ordered factor
+rf$month <- factor(rf$month, levels=c("Jun", "July"), ordered=TRUE)
+
+# Convert numeric columns to numeric
+num <- c("ach_pos_outcomes", "rf_moremot", "obtainprotect_moremot", "travel_car_l", "travel_air_l", "travel_pubtrans_l", "travel_rideshare_l", "travel_taxi_l", "stay_hotel_l", "stay_rental_l", "out_restaurant_l", "out_publicevent_l", "out_bar_l", "out_largegathering_l", "drink_home_l", "online_gathering_l", "shop_mall_l", "shop_grocery_l", "order_grocery_delivery_l", "order_grocery_pickup_l", "new_prod_brand_l", "shop_nonessential_instore_l", "shop_nonessential_online_l", "wash_hands_sanitizer", "wear_mask_self_family", "wear_mask_others", "wear_gloves", "social_distancing", "avoid_places_no_socdist", "clean_disinfect", "covid_threat_personal", "covid_threat_peers", "life_return_normal", "avoid_neg_cons", "ach_new_exps", "duties_oblig", "get_to_do", "have_to_do", "proper_behavior", "avoid_outofstyle", "parties_fit_in", "uncertain_look_to_others", "avoid_outofplace", "slang", "what_others_wear", "disapproval_change", "imp_fit_in", "beh_depends_on_others", "uncertain_look_to_others2", "keep_up_clothing", "not_follow_crowd", "risks_fun", "risk_taker", "enjoy_risk", "risk_even_if_hurt", "risks_imp", "common_risky_dec", "believe_taking_chances", "attracted_by_risk", "people_listen", "wishes_dont_carry_weight", "get_others_todo", "views_little_sway", "have_power", "ideas_op_ignored", "unable_get_way", "make_decisions", "age") # Define numeric columns
+rf[num] <- lapply(rf[num], as.character) # Convert numeric columns to character (before numeric) to prevent values from changing
+rf[num] <- lapply(rf[num], as.numeric) # Convert numeric columns to numeric
+rm(num) # Clear mfraw.num from workspace as it is no longer needed
+
+## CREATE 2019 AND 2020 SUBSETS
+
+rf_2019 <- dplyr::filter(rf, covid == "Pre-Covid")
+rf_2020 <- dplyr::filter(rf, covid == "Post-Covid")
+rf_2020a <- dplyr::filter(rf, covid == "Post-Covid" & month == "Jun")
+rf_2020b <- dplyr::filter(rf, covid == "Post-Covid" & month == "July")
 ```
 
 # Participants
 
-## 2019 Data (Before COVID-19 Pandemic)
+## 2019 Data (Pre-Covid-19 Pandemic)
 
 ```{r rf_2019_ps}
 # Gender
@@ -299,6 +605,20 @@ fiftyfive64 <- round(nrow(filter(rf_2019, agegroup == "55 - 64"))/
 sixtyfiveplus <- round(nrow(filter(rf_2019, agegroup == "65 or older"))/
                          nrow(rf_2019)*100, digits = 0) # 3%
 
+# Income
+ten20 <- round(nrow(filter(rf_2019, income == "$10,000 - $20,000"))/nrow(rf_2019)*100, digits = 0) # 5%
+twenty40 <- round(nrow(filter(rf_2019, income == "$20,001 - $40,000"))/nrow(rf_2019)*100, digits = 0) # 24%
+forty70 <- round(nrow(filter(rf_2019, income == "$40,001 - $70,000"))/nrow(rf_2019)*100, digits = 0) # 28%
+seventy100 <- round(nrow(filter(rf_2019, income == "$70,001 - $100,000"))/nrow(rf_2019)*100, digits = 0) # 22%
+hundred250 <- round(nrow(filter(rf_2019, income == "$100,001 - $250,000"))/nrow(rf_2019)*100, digits = 0) # 15%
+
+# Education
+highschool <- round(nrow(filter(rf_2019, education == "High School Diploma"))/nrow(rf_2019)*100, digits = 0) # 36%
+associates <- round(nrow(filter(rf_2019, education == "Associates Degree"))/nrow(rf_2019)*100, digits = 0) # 15%
+bachelors <- round(nrow(filter(rf_2019, education == "Bachelors Degree"))/nrow(rf_2019)*100, digits = 0) # 38%
+grad <- round(nrow(filter(rf_2019, education == "Graduate Degree"))/nrow(rf_2019)*100, digits = 0) # 10%
+edother <- round(nrow(filter(rf_2019, education == "Other"))/nrow(rf_2019)*100, digits = 0) # <1%
+
 # Political Orientation
 stronglycons <- round(nrow(filter(rf_2019, pol_orient == "Strongly Conservative"))/
                         nrow(rf_2019)*100, digits = 0) # 4%
@@ -316,157 +636,270 @@ stronglylib <- round(nrow(filter(rf_2019, pol_orient == "Strongly Liberal"))/
                        nrow(rf_2019)*100, digits = 0) # 18%
 ```
 
-## 2020 Data (After COVID-19 Pandemic)
+## 2020 Study 1 Data (Post-Covid-19 Pandemic)
 
-```{r rf_2020_ps}
+```{r rf_2020a_ps}
 # Gender
-male <- sum(rf_2020$gender == "Male", na.rm = T) # n = 294
-female <- sum(rf_2020$gender == "Female", na.rm = T) # n = 306
-malepct <- round(male/nrow(rf_2020)*100, digits = 0) # 49%
-femalepct <- round(female/nrow(rf_2020)*100, digits = 0) # 51%
+male <- sum(rf_2020a$gender == "Male", na.rm = T) # n = 294
+female <- sum(rf_2020a$gender == "Female", na.rm = T) # n = 306
+malepct <- round(male/nrow(rf_2020a)*100, digits = 0) # 49%
+femalepct <- round(female/nrow(rf_2020a)*100, digits = 0) # 51%
 
 # Age Group
-eighteen24 <- round(nrow(filter(rf_2020, agegroup == "18 - 24"))/
-                      nrow(rf_2020)*100, digits = 0) # 8%
-twentyfive34 <- round(nrow(filter(rf_2020, agegroup == "25 - 34"))/
-                        nrow(rf_2020)*100, digits = 0) # 27%
-thirtyfive44 <- round(nrow(filter(rf_2020, agegroup == "35 - 44"))/
-                        nrow(rf_2020)*100, digits = 0) # 8%
-fortyfive54 <- round(nrow(filter(rf_2020, agegroup == "45 - 54"))/
-                       nrow(rf_2020)*100, digits = 0) # 16%
-fiftyfive64 <- round(nrow(filter(rf_2020, agegroup == "55 - 64"))/
-                       nrow(rf_2020)*100, digits = 0) # 35%
-sixtyfiveplus <- round(nrow(filter(rf_2020, agegroup == "65 or older"))/
-                         nrow(rf_2020)*100, digits = 0) # 6%
+eighteen24 <- round(nrow(filter(rf_2020a, agegroup == "18 - 24"))/
+                      nrow(rf_2020a)*100, digits = 0) # 8%
+twentyfive34 <- round(nrow(filter(rf_2020a, agegroup == "25 - 34"))/
+                        nrow(rf_2020a)*100, digits = 0) # 27%
+thirtyfive44 <- round(nrow(filter(rf_2020a, agegroup == "35 - 44"))/
+                        nrow(rf_2020a)*100, digits = 0) # 8%
+fortyfive54 <- round(nrow(filter(rf_2020a, agegroup == "45 - 54"))/
+                       nrow(rf_2020a)*100, digits = 0) # 16%
+fiftyfive64 <- round(nrow(filter(rf_2020a, agegroup == "55 - 64"))/
+                       nrow(rf_2020a)*100, digits = 0) # 35%
+sixtyfiveplus <- round(nrow(filter(rf_2020a, agegroup == "65 or older"))/
+                         nrow(rf_2020a)*100, digits = 0) # 6%
+
+# Income
+zero10 <- round(nrow(filter(rf_2020a, income == "$0 - $10,000"))/nrow(rf_2020a)*100, digits = 0) # 8%
+ten20 <- round(nrow(filter(rf_2020a, income == "$10,000 - $20,000"))/nrow(rf_2020a)*100, digits = 0) # 9%
+twenty40 <- round(nrow(filter(rf_2020a, income == "$20,001 - $40,000"))/nrow(rf_2020a)*100, digits = 0) # 22%
+forty70 <- round(nrow(filter(rf_2020a, income == "$40,001 - $70,000"))/nrow(rf_2020a)*100, digits = 0) # 24%
+seventy100 <- round(nrow(filter(rf_2020a, income == "$70,001 - $100,000"))/nrow(rf_2020a)*100, digits = 0) # 18%
+hundred250 <- round(nrow(filter(rf_2020a, income == "$100,001 - $250,000"))/nrow(rf_2020a)*100, digits = 0) # 17%
+twofiftyplus <- round(nrow(filter(rf_2020a, income == "$250,001+"))/nrow(rf_2020a)*100, digits = 0) # 3%
+
+# Education
+highschool <- round(nrow(filter(rf_2020a, education == "High School Diploma"))/nrow(rf_2020a)*100, digits = 0) # 27%
+associates <- round(nrow(filter(rf_2020a, education == "Associates Degree"))/nrow(rf_2020a)*100, digits = 0) # 17%
+bachelors <- round(nrow(filter(rf_2020a, education == "Bachelors Degree"))/nrow(rf_2020a)*100, digits = 0) # 33%
+grad <- round(nrow(filter(rf_2020a, education == "Graduate Degree"))/nrow(rf_2020a)*100, digits = 0) # 18%
+edother <- round(nrow(filter(rf_2020a, education == "Other"))/nrow(rf_2020a)*100, digits = 0) # 5%
 
 # Political Orientation
-stronglycons <- round(nrow(filter(rf_2020, pol_orient == "Strongly Conservative"))/
-                        nrow(rf_2020)*100, digits = 0) # 11%
-cons <- round(nrow(filter(rf_2020, pol_orient == "Conservative"))/
-                nrow(rf_2020)*100, digits = 0) # 16%
-slightlycons <- round(nrow(filter(rf_2020, pol_orient == "Slightly Conservative"))/
-                        nrow(rf_2020)*100, digits = 0) # 10%
-moderate <- round(nrow(filter(rf_2020, pol_orient == "Moderate"))/
-                    nrow(rf_2020)*100, digits = 0) # 36%
-slightlylib <- round(nrow(filter(rf_2020, pol_orient == "Slightly Liberal"))/
-                       nrow(rf_2020)*100, digits = 0) # 8%
-lib <- round(nrow(filter(rf_2020, pol_orient == "Liberal"))/
-               nrow(rf_2020)*100, digits = 0) # 10%
-stronglylib <- round(nrow(filter(rf_2020, pol_orient == "Strongly Liberal"))/
-                       nrow(rf_2020)*100, digits = 0) # 9%
+stronglycons <- round(nrow(filter(rf_2020a, pol_orient == "Strongly Conservative"))/
+                        nrow(rf_2020a)*100, digits = 0) # 11%
+cons <- round(nrow(filter(rf_2020a, pol_orient == "Conservative"))/
+                nrow(rf_2020a)*100, digits = 0) # 16%
+slightlycons <- round(nrow(filter(rf_2020a, pol_orient == "Slightly Conservative"))/
+                        nrow(rf_2020a)*100, digits = 0) # 10%
+moderate <- round(nrow(filter(rf_2020a, pol_orient == "Moderate"))/
+                    nrow(rf_2020a)*100, digits = 0) # 36%
+slightlylib <- round(nrow(filter(rf_2020a, pol_orient == "Slightly Liberal"))/
+                       nrow(rf_2020a)*100, digits = 0) # 8%
+lib <- round(nrow(filter(rf_2020a, pol_orient == "Liberal"))/
+               nrow(rf_2020a)*100, digits = 0) # 10%
+stronglylib <- round(nrow(filter(rf_2020a, pol_orient == "Strongly Liberal"))/
+                       nrow(rf_2020a)*100, digits = 0) # 9%
+```
+
+## 2020 Study 2 Data (Post-Covid-19 Pandemic)
+
+```{r rf_2020b_ps}
+# Gender
+male <- sum(rf_2020b$gender == "Male", na.rm = T) # n = 294
+female <- sum(rf_2020b$gender == "Female", na.rm = T) # n = 306
+malepct <- round(male/nrow(rf_2020b)*100, digits = 0) # 49%
+femalepct <- round(female/nrow(rf_2020b)*100, digits = 0) # 51%
+
+# Age Group
+eighteen24 <- round(nrow(filter(rf_2020b, agegroup == "18 - 24"))/
+                      nrow(rf_2020b)*100, digits = 0) # 8%
+twentyfive34 <- round(nrow(filter(rf_2020b, agegroup == "25 - 34"))/
+                        nrow(rf_2020b)*100, digits = 0) # 28%
+thirtyfive44 <- round(nrow(filter(rf_2020b, agegroup == "35 - 44"))/
+                        nrow(rf_2020b)*100, digits = 0) # 8%
+fortyfive54 <- round(nrow(filter(rf_2020b, agegroup == "45 - 54"))/
+                       nrow(rf_2020b)*100, digits = 0) # 13%
+fiftyfive64 <- round(nrow(filter(rf_2020b, agegroup == "55 - 64"))/
+                       nrow(rf_2020b)*100, digits = 0) # 39%
+sixtyfiveplus <- round(nrow(filter(rf_2020b, agegroup == "65 or older"))/
+                         nrow(rf_2020b)*100, digits = 0) # 3%
+
+# Income
+zero10 <- round(nrow(filter(rf_2020b, income == "$0 - $10,000"))/nrow(rf_2020b)*100, digits = 0) # 5%
+ten20 <- round(nrow(filter(rf_2020b, income == "$10,000 - $20,000"))/nrow(rf_2020b)*100, digits = 0) # 6%
+twenty40 <- round(nrow(filter(rf_2020b, income == "$20,001 - $40,000"))/nrow(rf_2020b)*100, digits = 0) # 16%
+forty70 <- round(nrow(filter(rf_2020b, income == "$40,001 - $70,000"))/nrow(rf_2020b)*100, digits = 0) # 28%
+seventy100 <- round(nrow(filter(rf_2020b, income == "$70,001 - $100,000"))/nrow(rf_2020b)*100, digits = 0) # 20%
+hundred250 <- round(nrow(filter(rf_2020b, income == "$100,001 - $250,000"))/nrow(rf_2020b)*100, digits = 0) # 22%
+twofiftyplus <- round(nrow(filter(rf_2020b, income == "$250,001+"))/nrow(rf_2020b)*100, digits = 0) # 2%
+
+# Education
+highschool <- round(nrow(filter(rf_2020b, education == "High School Diploma"))/nrow(rf_2020b)*100, digits = 0) # 35%
+associates <- round(nrow(filter(rf_2020b, education == "Associates Degree"))/nrow(rf_2020b)*100, digits = 0) # 11%
+bachelors <- round(nrow(filter(rf_2020b, education == "Bachelors Degree"))/nrow(rf_2020b)*100, digits = 0) # 36%
+grad <- round(nrow(filter(rf_2020b, education == "Graduate Degree"))/nrow(rf_2020b)*100, digits = 0) # 17%
+edother <- round(nrow(filter(rf_2020b, education == "Other"))/nrow(rf_2020b)*100, digits = 0) # 2%
+
+# Political Orientation
+stronglycons <- round(nrow(filter(rf_2020b, pol_orient == "Strongly Conservative"))/
+                        nrow(rf_2020b)*100, digits = 0) # 8%
+cons <- round(nrow(filter(rf_2020b, pol_orient == "Conservative"))/
+                nrow(rf_2020b)*100, digits = 0) # 14%
+slightlycons <- round(nrow(filter(rf_2020b, pol_orient == "Slightly Conservative"))/
+                        nrow(rf_2020b)*100, digits = 0) # 11%
+moderate <- round(nrow(filter(rf_2020b, pol_orient == "Moderate"))/
+                    nrow(rf_2020b)*100, digits = 0) # 35%
+slightlylib <- round(nrow(filter(rf_2020b, pol_orient == "Slightly Liberal"))/
+                       nrow(rf_2020b)*100, digits = 0) # 8%
+lib <- round(nrow(filter(rf_2020b, pol_orient == "Liberal"))/
+               nrow(rf_2020b)*100, digits = 0) # 13%
+stronglylib <- round(nrow(filter(rf_2020b, pol_orient == "Strongly Liberal"))/
+                       nrow(rf_2020b)*100, digits = 0) # 10%
 ```
 
 # Regulatory Focus Questionnaire: Summary Statistics
 
-## 2019 Data (Before COVID-19 Pandemic)
+## 2019 Data (Pre-Covid-19 Pandemic)
 
 ```{r rf_2019_rf}
 prommean <- myround(mean(rf_2019$prom, na.rm = T), digits = 2) # 3.59
 promsd <- myround(sd(rf_2019$prom, na.rm = T), digits = 2) # 0.71
 prom <- select(rf_2019, rfq_1, rfq_3, rfq_7, rfq_9, rfq_10, rfq_11)
+prom$rfq_1 <- 6 - prom$rfq_1
+prom$rfq_9 <- 6 - prom$rfq_9
+prom$rfq_11 <- 6 - prom$rfq_11
 promalpha <- myround(psych::alpha(prom, check.keys = TRUE)$total["raw_alpha"],
-                     digits = 2)
-# Accounts for rev-scored as expected; alpha = 0.74
+                     digits = 2) # 0.74
 
 prevmean <- myround(mean(rf_2019$prev, na.rm = T), digits = 2) # 3.43
 prevsd <- myround(sd(rf_2019$prev, na.rm = T), digits = 2) # 0.84
 prev <- select(rf_2019, rfq_2, rfq_4, rfq_5, rfq_6, rfq_8)
+prev$rfq_2 <- 6 - prev$rfq_2
+prev$rfq_4 <- 6 - prev$rfq_4
+prev$rfq_6 <- 6 - prev$rfq_6
+prev$rfq_8 <- 6 - prev$rfq_8
 prevalpha <- myround(psych::alpha(prev, check.keys = TRUE)$total["raw_alpha"],
-                     digits = 2)
-# Accounts for rev-scored as expected; as expected; alpha = 0.84
+                     digits = 2) # 0.84
 ```
 
-## 2020 Data (After COVID-19 Pandemic)
+## 2020 Study 1 Data (Post-Covid-19 Pandemic)
 
-```{r rf_2020_rf}
-prommean <- myround(mean(rf_2020$prom, na.rm = T), digits = 2) # 3.46
-promsd <- myround(sd(rf_2020$prom, na.rm = T), digits = 2) # 0.62
-prom <- select(rf_2020, rfq_1, rfq_3, rfq_7, rfq_9, rfq_10, rfq_11)
+```{r rf_2020a_rf}
+prommean <- myround(mean(rf_2020a$prom, na.rm = T), digits = 2) # 3.46
+promsd <- myround(sd(rf_2020a$prom, na.rm = T), digits = 2) # 0.62
+prom <- select(rf_2020a, rfq_1, rfq_3, rfq_7, rfq_9, rfq_10, rfq_11)
+prom$rfq_1 <- 6 - prom$rfq_1
+prom$rfq_9 <- 6 - prom$rfq_9
+prom$rfq_11 <- 6 - prom$rfq_11
 promalpha <- myround(psych::alpha(prom, check.keys = TRUE)$total["raw_alpha"], 
-                     digits = 2)
-# Accounts for rev-scored as expected; alpha = 0.63
+                     digits = 2) # 0.63
 
-prevmean <- myround(mean(rf_2020$prev, na.rm = T), digits = 2) # 3.40
-prevsd <- myround(sd(rf_2020$prev, na.rm = T), digits = 2) # 0.81
-prev <- select(rf_2020, rfq_2, rfq_4, rfq_5, rfq_6, rfq_8)
+prevmean <- myround(mean(rf_2020a$prev, na.rm = T), digits = 2) # 3.40
+prevsd <- myround(sd(rf_2020a$prev, na.rm = T), digits = 2) # 0.81
+prev <- select(rf_2020a, rfq_2, rfq_4, rfq_5, rfq_6, rfq_8)
+prev$rfq_2 <- 6 - prev$rfq_2
+prev$rfq_4 <- 6 - prev$rfq_4
+prev$rfq_6 <- 6 - prev$rfq_6
+prev$rfq_8 <- 6 - prev$rfq_8
 prevalpha <- myround(psych::alpha(prev, check.keys = TRUE)$total["raw_alpha"], 
-                     digits = 2)
-# Accounts for rev-scored as expected; alpha = 0.80
+                     digits = 2) # 0.80
 ```
 
-# Results
+## 2020 Study 2 Data (Post-Covid-19 Pandemic)
 
-## Differences in Regulatory Focus Before Versus After Start of COVID-19 Pandemic
+```{r rf_2020b_rf}
+prommean <- myround(mean(rf_2020b$prom, na.rm = T), digits = 2) # 2.85
+promsd <- myround(sd(rf_2020b$prom, na.rm = T), digits = 2) # 0.35
+prom <- select(rf_2020b, rfq_1, rfq_3, rfq_7, rfq_9, rfq_10, rfq_11)
+prom$rfq_1 <- 6 - prom$rfq_1
+prom$rfq_9 <- 6 - prom$rfq_9
+prom$rfq_11 <- 6 - prom$rfq_11
+promalpha <- myround(psych::alpha(prom, check.keys = TRUE)$total["raw_alpha"], 
+                     digits = 2) # 0.61
 
-```{r prom_diff}
-prom.year <- lm(prom ~ year.d + agegroup.num + pol_orient.num, data = rf)
-summary(prom.year)
-prom.year.data <- summary(prom.year)$coefficients
-
-prom.year.b <- prom.year.data["year.d", "Estimate"]
-prom.year.se <- prom.year.data["year.d", "Std. Error"]
-prom.year.t <- prom.year.data["year.d", "t value"]
-prom.year.df <- summary(prom.year)$df[2]
-prom.year.p <- prom.year.data["year.d", "Pr(>|t|)"]
-
-confint(prom.year)
+prevmean <- myround(mean(rf_2020b$prev, na.rm = T), digits = 2) # 3.02
+prevsd <- myround(sd(rf_2020b$prev, na.rm = T), digits = 2) # 0.46
+prev <- select(rf_2020b, rfq_2, rfq_4, rfq_5, rfq_6, rfq_8)
+prev$rfq_2 <- 6 - prev$rfq_2
+prev$rfq_4 <- 6 - prev$rfq_4
+prev$rfq_6 <- 6 - prev$rfq_6
+prev$rfq_8 <- 6 - prev$rfq_8
+prevalpha <- myround(psych::alpha(prev, check.keys = TRUE)$total["raw_alpha"], 
+                     digits = 2) # 0.59
 ```
 
-```{r prev_diff}
-prev.year <- lm(prev ~ year.d + agegroup.num + pol_orient.num, data = rf)
-summary(prev.year)
-prev.year.data <- summary(prev.year)$coefficients
+# Study 1 Results
 
-prev.year.b <- prev.year.data["year.d", "Estimate"]
-prev.year.se <- prev.year.data["year.d", "Std. Error"]
-prev.year.t <- prev.year.data["year.d", "t value"]
-prev.year.df <- summary(prev.year)$df[2]
-prev.year.p <- prev.year.data["year.d", "Pr(>|t|)"]
+## Differences in Regulatory Focus Before Versus After Start of Covid-19 Pandemic
 
-confint(prev.year)
+```{r s1_prom_diff}
+prom.covid <- lm(prom ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")))
+summary(prom.covid)
+prom.covid.data <- summary(prom.covid)$coefficients
+
+prom.covid.b <- prom.covid.data["covid.d", "Estimate"]
+prom.covid.se <- prom.covid.data["covid.d", "Std. Error"]
+prom.covid.t <- prom.covid.data["covid.d", "t value"]
+prom.covid.df <- summary(prom.covid)$df[2]
+prom.covid.p <- prom.covid.data["covid.d", "Pr(>|t|)"]
+
+confint(prom.covid)
 ```
 
-```{r aim1_plots}
-promsummary <- summarySE(rf, measurevar="prom", groupvars=c("year"))
-promplot <- ggplot(data = rf, aes(x = year, y = prom)) +
+```{r s1_prev_diff}
+prev.covid <- lm(prev ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")))
+summary(prev.covid)
+prev.covid.data <- summary(prev.covid)$coefficients
+
+prev.covid.b <- prev.covid.data["covid.d", "Estimate"]
+prev.covid.se <- prev.covid.data["covid.d", "Std. Error"]
+prev.covid.t <- prev.covid.data["covid.d", "t value"]
+prev.covid.df <- summary(prev.covid)$df[2]
+prev.covid.p <- prev.covid.data["covid.d", "Pr(>|t|)"]
+
+confint(prev.covid)
+```
+
+```{r s1_aim1_plots}
+# Determining pre- vs. post-Covid predictions at typical 
+# levels of age group and political orientation
+pred <- data.frame(
+  covidF = c("Pre-Covid", "Post-Covid"),
+  covid.d = c(0, 1),
+  agegroup.num.c = 0,
+  pol_orient.num.c = 0)
+prompred <- cbind(pred, predict(prom.covid, pred, se.fit = TRUE))
+prevpred <- cbind(pred, predict(prev.covid, pred, se.fit = TRUE))
+
+promplot <- ggplot(data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")), aes(x = covidF, y = prom)) +
   geom_point(alpha = .15, color = "seagreen3", 
              position = position_jitter(height = .05, width = .2)) +
-  geom_point(data = promsummary, color = "black", size = 1.5) +
-  geom_errorbar(data = promsummary, aes(ymin = prom - se, ymax = prom + se),
+  geom_point(data = prompred, aes(x = covidF, y = fit), color = "black", size = 1.5) +
+  geom_errorbar(data = prompred, aes(x = covidF, y = fit, ymin = fit - se.fit, ymax = fit + se.fit),
                 width = .4, color = "black", size = .4) +
   geom_signif(y_position = c(4.2), xmin = c(1), xmax = c(2), annotation = c("***"),
               textsize = 6, color = "black", vjust = -.4) +
   scale_y_continuous(limits = c(1, 5)) +
   annotate("text", x = .6, y = 1.5, label = "a", size = 9) +
-  labs(x = "Year", y = "Promotion Pride")
+  labs(x = "Pre- Versus Post-Covid-19", y = "Promotion Pride")
 
-prevsummary <- summarySE(rf, measurevar="prev", groupvars=c("year"))
-prevplot <- ggplot(data = rf, aes(x = year, y = prev)) +
+prevplot <- ggplot(data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")), aes(x = covidF, y = prev)) +
   geom_point(alpha = .15, color = "lightcoral",
              position = position_jitter(height = .05, width = .2)) +
-  geom_point(data = prevsummary, color = "black", size = 1.5) +
-  geom_errorbar(data = prevsummary, aes(ymin = prev - se, ymax = prev + se),
+  geom_point(data = prevpred, aes(x = covidF, y = fit), color = "black", size = 1.5) +
+  geom_errorbar(data = prevpred, aes(x = covidF, y = fit, ymin = fit - se.fit, ymax = fit + se.fit),
                 width = .4, color = "black", size = .4) +
   geom_signif(y_position = c(4.2), xmin = c(1), xmax = c(2), annotation = c("*"),
               textsize = 6, color = "black", vjust = -.4) +
   scale_y_continuous(limits = c(1, 5)) +
   annotate("text", x = .6, y = 1.5, label = "b", size = 9) +
-  labs(x = "Year", y = "Prevention Pride")
+  labs(x = "Pre- Versus Post-Covid-19", y = "Prevention Pride")
 ```
 
-Figure 1: Differences in promotion pride and prevention pride before (2019) versus after (2020) the start of the COVID-19 pandemic, controlling for participants' age group and political ideology. Error bars represent standard errors of the mean.
+Figure 1: Model-predicted differences in promotion pride and prevention pride before versus after the start of the Covid-19 pandemic, at typical levels of age group and political ideology. Error bars represent standard errors of the mean.
 
 ```{r fig1, include = TRUE, fig.align = "center"}
 grid.arrange(promplot, prevplot, ncol=2, heights = c(3, 3), widths = c(4, 4))
 ```
 
-## Associations Between Post-COVID-19 Regulatory Focus Pride and Behavioral Outcomes
+## Associations Between Post-Covid-19 Regulatory Focus Pride and Behavioral Outcomes
 
-### Sensitivity to the Opening of the Market
+### Actively Searching for Information About the Opening of the Market
 
 ```{r foodest_open}
-foodest_open.rf <- glm(foodest_open_certain.d ~ prom + prev + agegroup.num + pol_orient.num,
-                       data = rf, family = "binomial")
+foodest_open.rf <- glm(foodest_open_certain.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
+                       data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")), family = "binomial")
 summary(foodest_open.rf)
 foodest_open.rf.data <- summary(foodest_open.rf)$coefficients
 
@@ -488,8 +921,8 @@ confint(foodest_open.rf)
 ```
 
 ```{r salon_open}
-salon_open.rf <- glm(salon_open_certain.d ~ prom + prev + agegroup.num + pol_orient.num,
-                     data = rf, family = "binomial")
+salon_open.rf <- glm(salon_open_certain.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
+                     data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")), family = "binomial")
 summary(salon_open.rf)
 salon_open.rf.data <- summary(salon_open.rf)$coefficients
 
@@ -510,10 +943,10 @@ salon_open.rf.prev.or <- exp(salon_open.rf.prev.b)
 confint(salon_open.rf)
 ```
 
-### Plans to Move Forward with Marketplace Activity
+### Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days
 
 ```{r foodest_plan}
-foodest_plan.rf <- glm(foodest_plan.d ~ prom + prev + agegroup.num + pol_orient.num,
+foodest_plan.rf <- glm(foodest_plan.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
                        data = foodest, family = "binomial")
 summary(foodest_plan.rf)
 foodest_plan.rf.data <- summary(foodest_plan.rf)$coefficients
@@ -536,7 +969,7 @@ confint(foodest_plan.rf)
 ```
 
 ```{r salon_plan}
-salon_plan.rf <- glm(salon_plan.d ~ prom + prev + agegroup.num + pol_orient.num,
+salon_plan.rf <- glm(salon_plan.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
                      data = salon, family = "binomial")
 summary(salon_plan.rf)
 salon_plan.rf.data <- summary(salon_plan.rf)$coefficients
@@ -558,10 +991,10 @@ salon_plan.rf.prev.or <- exp(salon_plan.rf.prev.b)
 confint(salon_plan.rf)
 ```
 
-### Behavior Involving Moving Forward with Marketplace Activity
+### Behavior Involving Moving Forward with Marketplace Activity in the Past 14 Days
 
 ```{r foodest_been}
-foodest_been.rf <- glm(foodest_been.d ~ prom + prev + agegroup.num + pol_orient.num,
+foodest_been.rf <- glm(foodest_been.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
                        data = foodest, family = "binomial")
 summary(foodest_been.rf)
 foodest_been.rf.data <- summary(foodest_been.rf)$coefficients
@@ -584,7 +1017,7 @@ confint(foodest_been.rf)
 ```
 
 ```{r salon_been}
-salon_been.rf <- glm(salon_been.d ~ prom + prev + agegroup.num + pol_orient.num,
+salon_been.rf <- glm(salon_been.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
                      data = salon, family = "binomial")
 summary(salon_been.rf)
 salon_been.rf.data <- summary(salon_been.rf)$coefficients
@@ -609,8 +1042,8 @@ confint(salon_been.rf)
 ### Usage of Vitamin Supplements for Health and Well-Being
 
 ```{r vitamins_current}
-vitamins_current.rf <- glm(vitamins_current.d ~ prom + prev + agegroup.num + pol_orient.num,
-                           data = rf, family = "binomial")
+vitamins_current.rf <- glm(vitamins_current.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
+                           data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")), family = "binomial")
 summary(vitamins_current.rf)
 vitamins_current.rf.data <- summary(vitamins_current.rf)$coefficients
 
@@ -634,8 +1067,788 @@ confint(vitamins_current.rf)
 ### Purchases Frozen Food
 
 ```{r frozenfood}
-frozenfood.rf <- glm(frozenfood.d ~ prom + prev + agegroup.num + pol_orient.num,
-                     data = rf, family = "binomial")
+frozenfood.rf <- glm(frozenfood.d ~ prom + prev + agegroup.num.c + pol_orient.num.c,
+                     data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")), family = "binomial")
 summary(frozenfood.rf)
 confint(frozenfood.rf)
+```
+
+# Study 2 Results
+
+## Differences in Regulatory Focus Before Versus After Start of Covid-19 Pandemic
+
+```{r s2_prom_diff}
+prom.covid <- lm(prom ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")))
+summary(prom.covid)
+prom.covid.data <- summary(prom.covid)$coefficients
+
+prom.covid.b <- prom.covid.data["covid.d", "Estimate"]
+prom.covid.se <- prom.covid.data["covid.d", "Std. Error"]
+prom.covid.t <- prom.covid.data["covid.d", "t value"]
+prom.covid.df <- summary(prom.covid)$df[2]
+prom.covid.p <- prom.covid.data["covid.d", "Pr(>|t|)"]
+
+confint(prom.covid)
+```
+
+```{r s2_prev_diff}
+prev.covid <- lm(prev ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")))
+summary(prev.covid)
+prev.covid.data <- summary(prev.covid)$coefficients
+
+prev.covid.b <- prev.covid.data["covid.d", "Estimate"]
+prev.covid.se <- prev.covid.data["covid.d", "Std. Error"]
+prev.covid.t <- prev.covid.data["covid.d", "t value"]
+prev.covid.df <- summary(prev.covid)$df[2]
+prev.covid.p <- prev.covid.data["covid.d", "Pr(>|t|)"]
+
+confint(prev.covid)
+```
+
+```{r s2_aim1_plots}
+# Determining pre- vs. post-Covid predictions at typical 
+# levels of age group and political orientation
+pred <- data.frame(
+  covidF = c("Pre-Covid", "Post-Covid"),
+  covid.d = c(0, 1),
+  agegroup.num.c = 0,
+  pol_orient.num.c = 0)
+prompred <- cbind(pred, predict(prom.covid, pred, se.fit = TRUE))
+prevpred <- cbind(pred, predict(prev.covid, pred, se.fit = TRUE))
+
+promplot <- ggplot(data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")), aes(x = covidF, y = prom)) +
+  geom_point(alpha = .15, color = "seagreen3", 
+             position = position_jitter(height = .05, width = .2)) +
+  geom_point(data = prompred, aes(x = covidF, y = fit), color = "black", size = 1.5) +
+  geom_errorbar(data = prompred, aes(x = covidF, y = fit, ymin = fit - se.fit, ymax = fit + se.fit),
+                width = .4, color = "black", size = .4) +
+  geom_signif(y_position = c(4.2), xmin = c(1), xmax = c(2), annotation = c("***"),
+              textsize = 6, color = "black", vjust = -.4) +
+  scale_y_continuous(limits = c(1, 5)) +
+  annotate("text", x = .6, y = 1.5, label = "a", size = 9) +
+  labs(x = "Pre- Versus Post-Covid-19", y = "Promotion Pride")
+
+prevplot <- ggplot(data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")), aes(x = covidF, y = prev)) +
+  geom_point(alpha = .15, color = "lightcoral",
+             position = position_jitter(height = .05, width = .2)) +
+  geom_point(data = prevpred, aes(x = covidF, y = fit), color = "black", size = 1.5) +
+  geom_errorbar(data = prevpred, aes(x = covidF, y = fit, ymin = fit - se.fit, ymax = fit + se.fit),
+                width = .4, color = "black", size = .4) +
+  geom_signif(y_position = c(4.2), xmin = c(1), xmax = c(2), annotation = c("***"),
+              textsize = 6, color = "black", vjust = -.4) +
+  scale_y_continuous(limits = c(1, 5)) +
+  annotate("text", x = .6, y = 1.5, label = "b", size = 9) +
+  labs(x = "Pre- Versus Post-Covid-19", y = "Prevention Pride")
+```
+
+Figure 2: Model-predicted differences in promotion pride and prevention pride before versus after the start of the Covid-19 pandemic at typical levels of age group and political ideology. Error bars represent standard errors of the mean.
+
+```{r fig2, include = TRUE, fig.align = "center"}
+grid.arrange(promplot, prevplot, ncol=2, heights = c(3, 3), widths = c(4, 4))
+```
+
+### Monthly Analysis
+
+```{r s1s2_prom_diff_age_pol}
+prom.month <- lm(prom ~ month.num + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(prom.month)
+prom.month.data <- summary(prom.month)$coefficients
+
+prom.month.b <- prom.month.data["month.num", "Estimate"]
+prom.month.se <- prom.month.data["month.num", "Std. Error"]
+prom.month.t <- prom.month.data["month.num", "t value"]
+prom.month.numf <- summary(prom.month)$df[2]
+prom.month.p <- prom.month.data["month.num", "Pr(>|t|)"]
+
+confint(prom.month)
+```
+
+```{r s1s2_prev_diff_age_pol}
+prev.month <- lm(prev ~ month.num + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(prev.month)
+prev.month.data <- summary(prev.month)$coefficients
+
+prev.month.b <- prev.month.data["month.num", "Estimate"]
+prev.month.se <- prev.month.data["month.num", "Std. Error"]
+prev.month.t <- prev.month.data["month.num", "t value"]
+prev.month.numf <- summary(prev.month)$df[2]
+prev.month.p <- prev.month.data["month.num", "Pr(>|t|)"]
+
+confint(prev.month)
+```
+
+## Associations Between Post-Covid-19 Regulatory Focus Pride and Behavioral Outcomes
+
+### Intentions and Behavior Regarding Marketplace Activity
+
+#### Moving Forward with Marketplace Activity in the Past 14 Days: Entertainment Activities
+
+```{r out_restaurant}
+out_restaurant.rf <- glm(out_restaurant.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(out_restaurant.rf)
+out_restaurant.rf.data <- summary(out_restaurant.rf)$coefficients
+
+out_restaurant.rf.prom.b <- out_restaurant.rf.data["prom", "Estimate"]
+out_restaurant.rf.prom.se <- out_restaurant.rf.data["prom", "Std. Error"]
+out_restaurant.rf.prom.z <- out_restaurant.rf.data["prom", "z value"]
+out_restaurant.rf.prom.df <- summary(out_restaurant.rf)$df[2]
+out_restaurant.rf.prom.p <- out_restaurant.rf.data["prom", "Pr(>|z|)"]
+out_restaurant.rf.prom.or <- exp(out_restaurant.rf.prom.b)
+
+out_restaurant.rf.prev.b <- out_restaurant.rf.data["prev", "Estimate"]
+out_restaurant.rf.prev.se <- out_restaurant.rf.data["prev", "Std. Error"]
+out_restaurant.rf.prev.z <- out_restaurant.rf.data["prev", "z value"]
+out_restaurant.rf.prev.df <- summary(out_restaurant.rf)$df[2]
+out_restaurant.rf.prev.p <- out_restaurant.rf.data["prev", "Pr(>|z|)"]
+out_restaurant.rf.prev.or <- exp(out_restaurant.rf.prev.b)
+
+confint(out_restaurant.rf)
+```
+
+```{r out_publicevent}
+out_publicevent.rf <- glm(out_publicevent.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(out_publicevent.rf)
+out_publicevent.rf.data <- summary(out_publicevent.rf)$coefficients
+
+out_publicevent.rf.prom.b <- out_publicevent.rf.data["prom", "Estimate"]
+out_publicevent.rf.prom.se <- out_publicevent.rf.data["prom", "Std. Error"]
+out_publicevent.rf.prom.z <- out_publicevent.rf.data["prom", "z value"]
+out_publicevent.rf.prom.df <- summary(out_publicevent.rf)$df[2]
+out_publicevent.rf.prom.p <- out_publicevent.rf.data["prom", "Pr(>|z|)"]
+out_publicevent.rf.prom.or <- exp(out_publicevent.rf.prom.b)
+
+out_publicevent.rf.prev.b <- out_publicevent.rf.data["prev", "Estimate"]
+out_publicevent.rf.prev.se <- out_publicevent.rf.data["prev", "Std. Error"]
+out_publicevent.rf.prev.z <- out_publicevent.rf.data["prev", "z value"]
+out_publicevent.rf.prev.df <- summary(out_publicevent.rf)$df[2]
+out_publicevent.rf.prev.p <- out_publicevent.rf.data["prev", "Pr(>|z|)"]
+out_publicevent.rf.prev.or <- exp(out_publicevent.rf.prev.b)
+
+confint(out_publicevent.rf)
+```
+
+```{r out_bar}
+out_bar.rf <- glm(out_bar.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(out_bar.rf)
+out_bar.rf.data <- summary(out_bar.rf)$coefficients
+
+out_bar.rf.prom.b <- out_bar.rf.data["prom", "Estimate"]
+out_bar.rf.prom.se <- out_bar.rf.data["prom", "Std. Error"]
+out_bar.rf.prom.z <- out_bar.rf.data["prom", "z value"]
+out_bar.rf.prom.df <- summary(out_bar.rf)$df[2]
+out_bar.rf.prom.p <- out_bar.rf.data["prom", "Pr(>|z|)"]
+out_bar.rf.prom.or <- exp(out_bar.rf.prom.b)
+
+out_bar.rf.prev.b <- out_bar.rf.data["prev", "Estimate"]
+out_bar.rf.prev.se <- out_bar.rf.data["prev", "Std. Error"]
+out_bar.rf.prev.z <- out_bar.rf.data["prev", "z value"]
+out_bar.rf.prev.df <- summary(out_bar.rf)$df[2]
+out_bar.rf.prev.p <- out_bar.rf.data["prev", "Pr(>|z|)"]
+out_bar.rf.prev.or <- exp(out_bar.rf.prev.b)
+
+confint(out_bar.rf)
+```
+
+#### Moving Forward with Marketplace Activity in the Past 14 Days: Shopping Activities
+
+```{r shop_mall}
+shop_mall.rf <- glm(shop_mall.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(shop_mall.rf)
+shop_mall.rf.data <- summary(shop_mall.rf)$coefficients
+
+shop_mall.rf.prom.b <- shop_mall.rf.data["prom", "Estimate"]
+shop_mall.rf.prom.se <- shop_mall.rf.data["prom", "Std. Error"]
+shop_mall.rf.prom.z <- shop_mall.rf.data["prom", "z value"]
+shop_mall.rf.prom.df <- summary(shop_mall.rf)$df[2]
+shop_mall.rf.prom.p <- shop_mall.rf.data["prom", "Pr(>|z|)"]
+shop_mall.rf.prom.or <- exp(shop_mall.rf.prom.b)
+
+shop_mall.rf.prev.b <- shop_mall.rf.data["prev", "Estimate"]
+shop_mall.rf.prev.se <- shop_mall.rf.data["prev", "Std. Error"]
+shop_mall.rf.prev.z <- shop_mall.rf.data["prev", "z value"]
+shop_mall.rf.prev.df <- summary(shop_mall.rf)$df[2]
+shop_mall.rf.prev.p <- shop_mall.rf.data["prev", "Pr(>|z|)"]
+shop_mall.rf.prev.or <- exp(shop_mall.rf.prev.b)
+
+confint(shop_mall.rf)
+```
+
+```{r shop_grocery}
+shop_grocery.rf <- glm(shop_grocery.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(shop_grocery.rf)
+shop_grocery.rf.data <- summary(shop_grocery.rf)$coefficients
+
+shop_grocery.rf.prom.b <- shop_grocery.rf.data["prom", "Estimate"]
+shop_grocery.rf.prom.se <- shop_grocery.rf.data["prom", "Std. Error"]
+shop_grocery.rf.prom.z <- shop_grocery.rf.data["prom", "z value"]
+shop_grocery.rf.prom.df <- summary(shop_grocery.rf)$df[2]
+shop_grocery.rf.prom.p <- shop_grocery.rf.data["prom", "Pr(>|z|)"]
+shop_grocery.rf.prom.or <- exp(shop_grocery.rf.prom.b)
+
+shop_grocery.rf.prev.b <- shop_grocery.rf.data["prev", "Estimate"]
+shop_grocery.rf.prev.se <- shop_grocery.rf.data["prev", "Std. Error"]
+shop_grocery.rf.prev.z <- shop_grocery.rf.data["prev", "z value"]
+shop_grocery.rf.prev.df <- summary(shop_grocery.rf)$df[2]
+shop_grocery.rf.prev.p <- shop_grocery.rf.data["prev", "Pr(>|z|)"]
+shop_grocery.rf.prev.or <- exp(shop_grocery.rf.prev.b)
+
+confint(shop_grocery.rf)
+```
+
+```{r order_grocery_delivery}
+order_grocery_delivery.rf <- glm(order_grocery_delivery.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(order_grocery_delivery.rf)
+order_grocery_delivery.rf.data <- summary(order_grocery_delivery.rf)$coefficients
+
+order_grocery_delivery.rf.prom.b <- order_grocery_delivery.rf.data["prom", "Estimate"]
+order_grocery_delivery.rf.prom.se <- order_grocery_delivery.rf.data["prom", "Std. Error"]
+order_grocery_delivery.rf.prom.z <- order_grocery_delivery.rf.data["prom", "z value"]
+order_grocery_delivery.rf.prom.df <- summary(order_grocery_delivery.rf)$df[2]
+order_grocery_delivery.rf.prom.p <- order_grocery_delivery.rf.data["prom", "Pr(>|z|)"]
+order_grocery_delivery.rf.prom.or <- exp(order_grocery_delivery.rf.prom.b)
+
+order_grocery_delivery.rf.prev.b <- order_grocery_delivery.rf.data["prev", "Estimate"]
+order_grocery_delivery.rf.prev.se <- order_grocery_delivery.rf.data["prev", "Std. Error"]
+order_grocery_delivery.rf.prev.z <- order_grocery_delivery.rf.data["prev", "z value"]
+order_grocery_delivery.rf.prev.df <- summary(order_grocery_delivery.rf)$df[2]
+order_grocery_delivery.rf.prev.p <- order_grocery_delivery.rf.data["prev", "Pr(>|z|)"]
+order_grocery_delivery.rf.prev.or <- exp(order_grocery_delivery.rf.prev.b)
+
+confint(order_grocery_delivery.rf)
+```
+
+```{r order_grocery_pickup}
+order_grocery_pickup.rf <- glm(order_grocery_pickup.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(order_grocery_pickup.rf)
+order_grocery_pickup.rf.data <- summary(order_grocery_pickup.rf)$coefficients
+
+order_grocery_pickup.rf.prom.b <- order_grocery_pickup.rf.data["prom", "Estimate"]
+order_grocery_pickup.rf.prom.se <- order_grocery_pickup.rf.data["prom", "Std. Error"]
+order_grocery_pickup.rf.prom.z <- order_grocery_pickup.rf.data["prom", "z value"]
+order_grocery_pickup.rf.prom.df <- summary(order_grocery_pickup.rf)$df[2]
+order_grocery_pickup.rf.prom.p <- order_grocery_pickup.rf.data["prom", "Pr(>|z|)"]
+order_grocery_pickup.rf.prom.or <- exp(order_grocery_pickup.rf.prom.b)
+
+order_grocery_pickup.rf.prev.b <- order_grocery_pickup.rf.data["prev", "Estimate"]
+order_grocery_pickup.rf.prev.se <- order_grocery_pickup.rf.data["prev", "Std. Error"]
+order_grocery_pickup.rf.prev.z <- order_grocery_pickup.rf.data["prev", "z value"]
+order_grocery_pickup.rf.prev.df <- summary(order_grocery_pickup.rf)$df[2]
+order_grocery_pickup.rf.prev.p <- order_grocery_pickup.rf.data["prev", "Pr(>|z|)"]
+order_grocery_pickup.rf.prev.or <- exp(order_grocery_pickup.rf.prev.b)
+
+confint(order_grocery_pickup.rf)
+```
+
+#### Moving Forward with Marketplace Activity in the Past 14 Days: Transportation Activities
+
+```{r travel_car}
+travel_car.rf <- glm(travel_car.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(travel_car.rf)
+travel_car.rf.data <- summary(travel_car.rf)$coefficients
+
+travel_car.rf.prom.b <- travel_car.rf.data["prom", "Estimate"]
+travel_car.rf.prom.se <- travel_car.rf.data["prom", "Std. Error"]
+travel_car.rf.prom.z <- travel_car.rf.data["prom", "z value"]
+travel_car.rf.prom.df <- summary(travel_car.rf)$df[2]
+travel_car.rf.prom.p <- travel_car.rf.data["prom", "Pr(>|z|)"]
+travel_car.rf.prom.or <- exp(travel_car.rf.prom.b)
+
+travel_car.rf.prev.b <- travel_car.rf.data["prev", "Estimate"]
+travel_car.rf.prev.se <- travel_car.rf.data["prev", "Std. Error"]
+travel_car.rf.prev.z <- travel_car.rf.data["prev", "z value"]
+travel_car.rf.prev.df <- summary(travel_car.rf)$df[2]
+travel_car.rf.prev.p <- travel_car.rf.data["prev", "Pr(>|z|)"]
+travel_car.rf.prev.or <- exp(travel_car.rf.prev.b)
+
+confint(travel_car.rf)
+```
+
+```{r travel_air}
+travel_air.rf <- glm(travel_air.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(travel_air.rf)
+travel_air.rf.data <- summary(travel_air.rf)$coefficients
+
+travel_air.rf.prom.b <- travel_air.rf.data["prom", "Estimate"]
+travel_air.rf.prom.se <- travel_air.rf.data["prom", "Std. Error"]
+travel_air.rf.prom.z <- travel_air.rf.data["prom", "z value"]
+travel_air.rf.prom.df <- summary(travel_air.rf)$df[2]
+travel_air.rf.prom.p <- travel_air.rf.data["prom", "Pr(>|z|)"]
+travel_air.rf.prom.or <- exp(travel_air.rf.prom.b)
+
+travel_air.rf.prev.b <- travel_air.rf.data["prev", "Estimate"]
+travel_air.rf.prev.se <- travel_air.rf.data["prev", "Std. Error"]
+travel_air.rf.prev.z <- travel_air.rf.data["prev", "z value"]
+travel_air.rf.prev.df <- summary(travel_air.rf)$df[2]
+travel_air.rf.prev.p <- travel_air.rf.data["prev", "Pr(>|z|)"]
+travel_air.rf.prev.or <- exp(travel_air.rf.prev.b)
+
+confint(travel_air.rf)
+```
+
+```{r travel_rideshare}
+travel_rideshare.rf <- glm(travel_rideshare.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(travel_rideshare.rf)
+travel_rideshare.rf.data <- summary(travel_rideshare.rf)$coefficients
+
+travel_rideshare.rf.prom.b <- travel_rideshare.rf.data["prom", "Estimate"]
+travel_rideshare.rf.prom.se <- travel_rideshare.rf.data["prom", "Std. Error"]
+travel_rideshare.rf.prom.z <- travel_rideshare.rf.data["prom", "z value"]
+travel_rideshare.rf.prom.df <- summary(travel_rideshare.rf)$df[2]
+travel_rideshare.rf.prom.p <- travel_rideshare.rf.data["prom", "Pr(>|z|)"]
+travel_rideshare.rf.prom.or <- exp(travel_rideshare.rf.prom.b)
+
+travel_rideshare.rf.prev.b <- travel_rideshare.rf.data["prev", "Estimate"]
+travel_rideshare.rf.prev.se <- travel_rideshare.rf.data["prev", "Std. Error"]
+travel_rideshare.rf.prev.z <- travel_rideshare.rf.data["prev", "z value"]
+travel_rideshare.rf.prev.df <- summary(travel_rideshare.rf)$df[2]
+travel_rideshare.rf.prev.p <- travel_rideshare.rf.data["prev", "Pr(>|z|)"]
+travel_rideshare.rf.prev.or <- exp(travel_rideshare.rf.prev.b)
+
+confint(travel_rideshare.rf)
+```
+
+```{r travel_taxi}
+travel_taxi.rf <- glm(travel_taxi.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+summary(travel_taxi.rf)
+travel_taxi.rf.data <- summary(travel_taxi.rf)$coefficients
+
+travel_taxi.rf.prom.b <- travel_taxi.rf.data["prom", "Estimate"]
+travel_taxi.rf.prom.se <- travel_taxi.rf.data["prom", "Std. Error"]
+travel_taxi.rf.prom.z <- travel_taxi.rf.data["prom", "z value"]
+travel_taxi.rf.prom.df <- summary(travel_taxi.rf)$df[2]
+travel_taxi.rf.prom.p <- travel_taxi.rf.data["prom", "Pr(>|z|)"]
+travel_taxi.rf.prom.or <- exp(travel_taxi.rf.prom.b)
+
+travel_taxi.rf.prev.b <- travel_taxi.rf.data["prev", "Estimate"]
+travel_taxi.rf.prev.se <- travel_taxi.rf.data["prev", "Std. Error"]
+travel_taxi.rf.prev.z <- travel_taxi.rf.data["prev", "z value"]
+travel_taxi.rf.prev.df <- summary(travel_taxi.rf)$df[2]
+travel_taxi.rf.prev.p <- travel_taxi.rf.data["prev", "Pr(>|z|)"]
+travel_taxi.rf.prev.or <- exp(travel_taxi.rf.prev.b)
+
+confint(travel_taxi.rf)
+```
+
+#### Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days: Entertainment Activities
+
+```{r out_restaurant_l}
+out_restaurant.rf <- lm(out_restaurant_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(out_restaurant.rf)
+out_restaurant.rf.data <- summary(out_restaurant.rf)$coefficients
+
+out_restaurant.rf.prom.b <- out_restaurant.rf.data["prom", "Estimate"]
+out_restaurant.rf.prom.se <- out_restaurant.rf.data["prom", "Std. Error"]
+out_restaurant.rf.prom.t <- out_restaurant.rf.data["prom", "t value"]
+out_restaurant.rf.prom.df <- round(summary(out_restaurant.rf)$df[2], digits = 0)
+out_restaurant.rf.prom.p <- out_restaurant.rf.data["prom", "Pr(>|t|)"]
+out_restaurant.rf.prom.or <- exp(out_restaurant.rf.prom.b)
+
+out_restaurant.rf.prev.b <- out_restaurant.rf.data["prev", "Estimate"]
+out_restaurant.rf.prev.se <- out_restaurant.rf.data["prev", "Std. Error"]
+out_restaurant.rf.prev.t <- out_restaurant.rf.data["prev", "t value"]
+out_restaurant.rf.prev.df <- round(summary(out_restaurant.rf)$df[2], digits = 0)
+out_restaurant.rf.prev.p <- out_restaurant.rf.data["prev", "Pr(>|t|)"]
+out_restaurant.rf.prev.or <- exp(out_restaurant.rf.prev.b)
+
+confint(out_restaurant.rf)
+```
+
+```{r out_publicevent_l}
+out_publicevent.rf <- lm(out_publicevent_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(out_publicevent.rf)
+out_publicevent.rf.data <- summary(out_publicevent.rf)$coefficients
+
+out_publicevent.rf.prom.b <- out_publicevent.rf.data["prom", "Estimate"]
+out_publicevent.rf.prom.se <- out_publicevent.rf.data["prom", "Std. Error"]
+out_publicevent.rf.prom.t <- out_publicevent.rf.data["prom", "t value"]
+out_publicevent.rf.prom.df <- round(summary(out_publicevent.rf)$df[2], digits = 0)
+out_publicevent.rf.prom.p <- out_publicevent.rf.data["prom", "Pr(>|t|)"]
+out_publicevent.rf.prom.or <- exp(out_publicevent.rf.prom.b)
+
+out_publicevent.rf.prev.b <- out_publicevent.rf.data["prev", "Estimate"]
+out_publicevent.rf.prev.se <- out_publicevent.rf.data["prev", "Std. Error"]
+out_publicevent.rf.prev.t <- out_publicevent.rf.data["prev", "t value"]
+out_publicevent.rf.prev.df <- round(summary(out_publicevent.rf)$df[2], digits = 0)
+out_publicevent.rf.prev.p <- out_publicevent.rf.data["prev", "Pr(>|t|)"]
+out_publicevent.rf.prev.or <- exp(out_publicevent.rf.prev.b)
+
+confint(out_publicevent.rf)
+```
+
+```{r out_bar_l}
+out_bar.rf <- lm(out_bar_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(out_bar.rf)
+out_bar.rf.data <- summary(out_bar.rf)$coefficients
+
+out_bar.rf.prom.b <- out_bar.rf.data["prom", "Estimate"]
+out_bar.rf.prom.se <- out_bar.rf.data["prom", "Std. Error"]
+out_bar.rf.prom.t <- out_bar.rf.data["prom", "t value"]
+out_bar.rf.prom.df <- round(summary(out_bar.rf)$df[2], digits = 0)
+out_bar.rf.prom.p <- out_bar.rf.data["prom", "Pr(>|t|)"]
+out_bar.rf.prom.or <- exp(out_bar.rf.prom.b)
+
+out_bar.rf.prev.b <- out_bar.rf.data["prev", "Estimate"]
+out_bar.rf.prev.se <- out_bar.rf.data["prev", "Std. Error"]
+out_bar.rf.prev.t <- out_bar.rf.data["prev", "t value"]
+out_bar.rf.prev.df <- round(summary(out_bar.rf)$df[2], digits = 0)
+out_bar.rf.prev.p <- out_bar.rf.data["prev", "Pr(>|t|)"]
+out_bar.rf.prev.or <- exp(out_bar.rf.prev.b)
+
+confint(out_bar.rf)
+```
+
+#### Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days: Shopping Activities
+
+```{r shop_mall_l}
+shop_mall.rf <- lm(shop_mall_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(shop_mall.rf)
+shop_mall.rf.data <- summary(shop_mall.rf)$coefficients
+
+shop_mall.rf.prom.b <- shop_mall.rf.data["prom", "Estimate"]
+shop_mall.rf.prom.se <- shop_mall.rf.data["prom", "Std. Error"]
+shop_mall.rf.prom.t <- shop_mall.rf.data["prom", "t value"]
+shop_mall.rf.prom.df <- round(summary(shop_mall.rf)$df[2], digits = 0)
+shop_mall.rf.prom.p <- shop_mall.rf.data["prom", "Pr(>|t|)"]
+shop_mall.rf.prom.or <- exp(shop_mall.rf.prom.b)
+
+shop_mall.rf.prev.b <- shop_mall.rf.data["prev", "Estimate"]
+shop_mall.rf.prev.se <- shop_mall.rf.data["prev", "Std. Error"]
+shop_mall.rf.prev.t <- shop_mall.rf.data["prev", "t value"]
+shop_mall.rf.prev.df <- round(summary(shop_mall.rf)$df[2], digits = 0)
+shop_mall.rf.prev.p <- shop_mall.rf.data["prev", "Pr(>|t|)"]
+shop_mall.rf.prev.or <- exp(shop_mall.rf.prev.b)
+
+confint(shop_mall.rf)
+```
+
+```{r shop_grocery_l}
+shop_grocery.rf <- lm(shop_grocery_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(shop_grocery.rf)
+shop_grocery.rf.data <- summary(shop_grocery.rf)$coefficients
+
+shop_grocery.rf.prom.b <- shop_grocery.rf.data["prom", "Estimate"]
+shop_grocery.rf.prom.se <- shop_grocery.rf.data["prom", "Std. Error"]
+shop_grocery.rf.prom.t <- shop_grocery.rf.data["prom", "t value"]
+shop_grocery.rf.prom.df <- round(summary(shop_grocery.rf)$df[2], digits = 0)
+shop_grocery.rf.prom.p <- shop_grocery.rf.data["prom", "Pr(>|t|)"]
+shop_grocery.rf.prom.or <- exp(shop_grocery.rf.prom.b)
+
+shop_grocery.rf.prev.b <- shop_grocery.rf.data["prev", "Estimate"]
+shop_grocery.rf.prev.se <- shop_grocery.rf.data["prev", "Std. Error"]
+shop_grocery.rf.prev.t <- shop_grocery.rf.data["prev", "t value"]
+shop_grocery.rf.prev.df <- round(summary(shop_grocery.rf)$df[2], digits = 0)
+shop_grocery.rf.prev.p <- shop_grocery.rf.data["prev", "Pr(>|t|)"]
+shop_grocery.rf.prev.or <- exp(shop_grocery.rf.prev.b)
+
+confint(shop_grocery.rf)
+```
+
+```{r order_grocery_delivery_l}
+order_grocery_delivery.rf <- lm(order_grocery_delivery_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(order_grocery_delivery.rf)
+order_grocery_delivery.rf.data <- summary(order_grocery_delivery.rf)$coefficients
+
+order_grocery_delivery.rf.prom.b <- order_grocery_delivery.rf.data["prom", "Estimate"]
+order_grocery_delivery.rf.prom.se <- order_grocery_delivery.rf.data["prom", "Std. Error"]
+order_grocery_delivery.rf.prom.t <- order_grocery_delivery.rf.data["prom", "t value"]
+order_grocery_delivery.rf.prom.df <- round(summary(order_grocery_delivery.rf)$df[2], digits = 0)
+order_grocery_delivery.rf.prom.p <- order_grocery_delivery.rf.data["prom", "Pr(>|t|)"]
+order_grocery_delivery.rf.prom.or <- exp(order_grocery_delivery.rf.prom.b)
+
+order_grocery_delivery.rf.prev.b <- order_grocery_delivery.rf.data["prev", "Estimate"]
+order_grocery_delivery.rf.prev.se <- order_grocery_delivery.rf.data["prev", "Std. Error"]
+order_grocery_delivery.rf.prev.t <- order_grocery_delivery.rf.data["prev", "t value"]
+order_grocery_delivery.rf.prev.df <- round(summary(order_grocery_delivery.rf)$df[2], digits = 0)
+order_grocery_delivery.rf.prev.p <- order_grocery_delivery.rf.data["prev", "Pr(>|t|)"]
+order_grocery_delivery.rf.prev.or <- exp(order_grocery_delivery.rf.prev.b)
+
+confint(order_grocery_delivery.rf)
+```
+
+```{r order_grocery_pickup_l}
+order_grocery_pickup.rf <- lm(order_grocery_pickup_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(order_grocery_pickup.rf)
+order_grocery_pickup.rf.data <- summary(order_grocery_pickup.rf)$coefficients
+
+order_grocery_pickup.rf.prom.b <- order_grocery_pickup.rf.data["prom", "Estimate"]
+order_grocery_pickup.rf.prom.se <- order_grocery_pickup.rf.data["prom", "Std. Error"]
+order_grocery_pickup.rf.prom.t <- order_grocery_pickup.rf.data["prom", "t value"]
+order_grocery_pickup.rf.prom.df <- round(summary(order_grocery_pickup.rf)$df[2], digits = 0)
+order_grocery_pickup.rf.prom.p <- order_grocery_pickup.rf.data["prom", "Pr(>|t|)"]
+order_grocery_pickup.rf.prom.or <- exp(order_grocery_pickup.rf.prom.b)
+
+order_grocery_pickup.rf.prev.b <- order_grocery_pickup.rf.data["prev", "Estimate"]
+order_grocery_pickup.rf.prev.se <- order_grocery_pickup.rf.data["prev", "Std. Error"]
+order_grocery_pickup.rf.prev.t <- order_grocery_pickup.rf.data["prev", "t value"]
+order_grocery_pickup.rf.prev.df <- round(summary(order_grocery_pickup.rf)$df[2], digits = 0)
+order_grocery_pickup.rf.prev.p <- order_grocery_pickup.rf.data["prev", "Pr(>|t|)"]
+order_grocery_pickup.rf.prev.or <- exp(order_grocery_pickup.rf.prev.b)
+
+confint(order_grocery_pickup.rf)
+```
+
+#### Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days: Transportation Activities
+
+```{r travel_car_l}
+travel_car.rf <- lm(travel_car_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(travel_car.rf)
+travel_car.rf.data <- summary(travel_car.rf)$coefficients
+
+travel_car.rf.prom.b <- travel_car.rf.data["prom", "Estimate"]
+travel_car.rf.prom.se <- travel_car.rf.data["prom", "Std. Error"]
+travel_car.rf.prom.t <- travel_car.rf.data["prom", "t value"]
+travel_car.rf.prom.df <- round(summary(travel_car.rf)$df[2], digits = 0)
+travel_car.rf.prom.p <- travel_car.rf.data["prom", "Pr(>|t|)"]
+travel_car.rf.prom.or <- exp(travel_car.rf.prom.b)
+
+travel_car.rf.prev.b <- travel_car.rf.data["prev", "Estimate"]
+travel_car.rf.prev.se <- travel_car.rf.data["prev", "Std. Error"]
+travel_car.rf.prev.t <- travel_car.rf.data["prev", "t value"]
+travel_car.rf.prev.df <- round(summary(travel_car.rf)$df[2], digits = 0)
+travel_car.rf.prev.p <- travel_car.rf.data["prev", "Pr(>|t|)"]
+travel_car.rf.prev.or <- exp(travel_car.rf.prev.b)
+
+confint(travel_car.rf)
+```
+
+```{r travel_air_l}
+travel_air.rf <- lm(travel_air_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(travel_air.rf)
+travel_air.rf.data <- summary(travel_air.rf)$coefficients
+
+travel_air.rf.prom.b <- travel_air.rf.data["prom", "Estimate"]
+travel_air.rf.prom.se <- travel_air.rf.data["prom", "Std. Error"]
+travel_air.rf.prom.t <- travel_air.rf.data["prom", "t value"]
+travel_air.rf.prom.df <- round(summary(travel_air.rf)$df[2], digits = 0)
+travel_air.rf.prom.p <- travel_air.rf.data["prom", "Pr(>|t|)"]
+travel_air.rf.prom.or <- exp(travel_air.rf.prom.b)
+
+travel_air.rf.prev.b <- travel_air.rf.data["prev", "Estimate"]
+travel_air.rf.prev.se <- travel_air.rf.data["prev", "Std. Error"]
+travel_air.rf.prev.t <- travel_air.rf.data["prev", "t value"]
+travel_air.rf.prev.df <- round(summary(travel_air.rf)$df[2], digits = 0)
+travel_air.rf.prev.p <- travel_air.rf.data["prev", "Pr(>|t|)"]
+travel_air.rf.prev.or <- exp(travel_air.rf.prev.b)
+
+confint(travel_air.rf)
+```
+
+```{r travel_rideshare_l}
+travel_rideshare.rf <- lm(travel_rideshare_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(travel_rideshare.rf)
+travel_rideshare.rf.data <- summary(travel_rideshare.rf)$coefficients
+
+travel_rideshare.rf.prom.b <- travel_rideshare.rf.data["prom", "Estimate"]
+travel_rideshare.rf.prom.se <- travel_rideshare.rf.data["prom", "Std. Error"]
+travel_rideshare.rf.prom.t <- travel_rideshare.rf.data["prom", "t value"]
+travel_rideshare.rf.prom.df <- round(summary(travel_rideshare.rf)$df[2], digits = 0)
+travel_rideshare.rf.prom.p <- travel_rideshare.rf.data["prom", "Pr(>|t|)"]
+travel_rideshare.rf.prom.or <- exp(travel_rideshare.rf.prom.b)
+
+travel_rideshare.rf.prev.b <- travel_rideshare.rf.data["prev", "Estimate"]
+travel_rideshare.rf.prev.se <- travel_rideshare.rf.data["prev", "Std. Error"]
+travel_rideshare.rf.prev.t <- travel_rideshare.rf.data["prev", "t value"]
+travel_rideshare.rf.prev.df <- round(summary(travel_rideshare.rf)$df[2], digits = 0)
+travel_rideshare.rf.prev.p <- travel_rideshare.rf.data["prev", "Pr(>|t|)"]
+travel_rideshare.rf.prev.or <- exp(travel_rideshare.rf.prev.b)
+
+confint(travel_rideshare.rf)
+```
+
+```{r travel_taxi_l}
+travel_taxi.rf <- lm(travel_taxi_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(travel_taxi.rf)
+travel_taxi.rf.data <- summary(travel_taxi.rf)$coefficients
+
+travel_taxi.rf.prom.b <- travel_taxi.rf.data["prom", "Estimate"]
+travel_taxi.rf.prom.se <- travel_taxi.rf.data["prom", "Std. Error"]
+travel_taxi.rf.prom.t <- travel_taxi.rf.data["prom", "t value"]
+travel_taxi.rf.prom.df <- round(summary(travel_taxi.rf)$df[2], digits = 0)
+travel_taxi.rf.prom.p <- travel_taxi.rf.data["prom", "Pr(>|t|)"]
+travel_taxi.rf.prom.or <- exp(travel_taxi.rf.prom.b)
+
+travel_taxi.rf.prev.b <- travel_taxi.rf.data["prev", "Estimate"]
+travel_taxi.rf.prev.se <- travel_taxi.rf.data["prev", "Std. Error"]
+travel_taxi.rf.prev.t <- travel_taxi.rf.data["prev", "t value"]
+travel_taxi.rf.prev.df <- round(summary(travel_taxi.rf)$df[2], digits = 0)
+travel_taxi.rf.prev.p <- travel_taxi.rf.data["prev", "Pr(>|t|)"]
+travel_taxi.rf.prev.or <- exp(travel_taxi.rf.prev.b)
+
+confint(travel_taxi.rf)
+```
+
+### Engagement in Pandemic-Related Safety Behaviors
+
+```{r wash_hands_sanitizer}
+wash_hands_sanitizer.rf <- lm(wash_hands_sanitizer ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(wash_hands_sanitizer.rf)
+wash_hands_sanitizer.rf.data <- summary(wash_hands_sanitizer.rf)$coefficients
+
+wash_hands_sanitizer.rf.prom.b <- wash_hands_sanitizer.rf.data["prom", "Estimate"]
+wash_hands_sanitizer.rf.prom.se <- wash_hands_sanitizer.rf.data["prom", "Std. Error"]
+wash_hands_sanitizer.rf.prom.t <- wash_hands_sanitizer.rf.data["prom", "t value"]
+wash_hands_sanitizer.rf.prom.df <- round(summary(wash_hands_sanitizer.rf)$df[2], digits = 0)
+wash_hands_sanitizer.rf.prom.p <- wash_hands_sanitizer.rf.data["prom", "Pr(>|t|)"]
+wash_hands_sanitizer.rf.prom.or <- exp(wash_hands_sanitizer.rf.prom.b)
+
+wash_hands_sanitizer.rf.prev.b <- wash_hands_sanitizer.rf.data["prev", "Estimate"]
+wash_hands_sanitizer.rf.prev.se <- wash_hands_sanitizer.rf.data["prev", "Std. Error"]
+wash_hands_sanitizer.rf.prev.t <- wash_hands_sanitizer.rf.data["prev", "t value"]
+wash_hands_sanitizer.rf.prev.df <- round(summary(wash_hands_sanitizer.rf)$df[2], digits = 0)
+wash_hands_sanitizer.rf.prev.p <- wash_hands_sanitizer.rf.data["prev", "Pr(>|t|)"]
+wash_hands_sanitizer.rf.prev.or <- exp(wash_hands_sanitizer.rf.prev.b)
+
+confint(wash_hands_sanitizer.rf)
+```
+
+```{r wear_mask_self_family}
+wear_mask_self_family.rf <- lm(wear_mask_self_family ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(wear_mask_self_family.rf)
+wear_mask_self_family.rf.data <- summary(wear_mask_self_family.rf)$coefficients
+
+wear_mask_self_family.rf.prom.b <- wear_mask_self_family.rf.data["prom", "Estimate"]
+wear_mask_self_family.rf.prom.se <- wear_mask_self_family.rf.data["prom", "Std. Error"]
+wear_mask_self_family.rf.prom.t <- wear_mask_self_family.rf.data["prom", "t value"]
+wear_mask_self_family.rf.prom.df <- round(summary(wear_mask_self_family.rf)$df[2], digits = 0)
+wear_mask_self_family.rf.prom.p <- wear_mask_self_family.rf.data["prom", "Pr(>|t|)"]
+wear_mask_self_family.rf.prom.or <- exp(wear_mask_self_family.rf.prom.b)
+
+wear_mask_self_family.rf.prev.b <- wear_mask_self_family.rf.data["prev", "Estimate"]
+wear_mask_self_family.rf.prev.se <- wear_mask_self_family.rf.data["prev", "Std. Error"]
+wear_mask_self_family.rf.prev.t <- wear_mask_self_family.rf.data["prev", "t value"]
+wear_mask_self_family.rf.prev.df <- round(summary(wear_mask_self_family.rf)$df[2], digits = 0)
+wear_mask_self_family.rf.prev.p <- wear_mask_self_family.rf.data["prev", "Pr(>|t|)"]
+wear_mask_self_family.rf.prev.or <- exp(wear_mask_self_family.rf.prev.b)
+
+confint(wear_mask_self_family.rf)
+```
+
+```{r wear_mask_others}
+wear_mask_others.rf <- lm(wear_mask_others ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(wear_mask_others.rf)
+wear_mask_others.rf.data <- summary(wear_mask_others.rf)$coefficients
+
+wear_mask_others.rf.prom.b <- wear_mask_others.rf.data["prom", "Estimate"]
+wear_mask_others.rf.prom.se <- wear_mask_others.rf.data["prom", "Std. Error"]
+wear_mask_others.rf.prom.t <- wear_mask_others.rf.data["prom", "t value"]
+wear_mask_others.rf.prom.df <- round(summary(wear_mask_others.rf)$df[2], digits = 0)
+wear_mask_others.rf.prom.p <- wear_mask_others.rf.data["prom", "Pr(>|t|)"]
+wear_mask_others.rf.prom.or <- exp(wear_mask_others.rf.prom.b)
+
+wear_mask_others.rf.prev.b <- wear_mask_others.rf.data["prev", "Estimate"]
+wear_mask_others.rf.prev.se <- wear_mask_others.rf.data["prev", "Std. Error"]
+wear_mask_others.rf.prev.t <- wear_mask_others.rf.data["prev", "t value"]
+wear_mask_others.rf.prev.df <- round(summary(wear_mask_others.rf)$df[2], digits = 0)
+wear_mask_others.rf.prev.p <- wear_mask_others.rf.data["prev", "Pr(>|t|)"]
+wear_mask_others.rf.prev.or <- exp(wear_mask_others.rf.prev.b)
+
+confint(wear_mask_others.rf)
+```
+
+```{r wear_gloves}
+wear_gloves.rf <- lm(wear_gloves ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(wear_gloves.rf)
+wear_gloves.rf.data <- summary(wear_gloves.rf)$coefficients
+
+wear_gloves.rf.prom.b <- wear_gloves.rf.data["prom", "Estimate"]
+wear_gloves.rf.prom.se <- wear_gloves.rf.data["prom", "Std. Error"]
+wear_gloves.rf.prom.t <- wear_gloves.rf.data["prom", "t value"]
+wear_gloves.rf.prom.df <- round(summary(wear_gloves.rf)$df[2], digits = 0)
+wear_gloves.rf.prom.p <- wear_gloves.rf.data["prom", "Pr(>|t|)"]
+wear_gloves.rf.prom.or <- exp(wear_gloves.rf.prom.b)
+
+wear_gloves.rf.prev.b <- wear_gloves.rf.data["prev", "Estimate"]
+wear_gloves.rf.prev.se <- wear_gloves.rf.data["prev", "Std. Error"]
+wear_gloves.rf.prev.t <- wear_gloves.rf.data["prev", "t value"]
+wear_gloves.rf.prev.df <- round(summary(wear_gloves.rf)$df[2], digits = 0)
+wear_gloves.rf.prev.p <- wear_gloves.rf.data["prev", "Pr(>|t|)"]
+wear_gloves.rf.prev.or <- exp(wear_gloves.rf.prev.b)
+
+confint(wear_gloves.rf)
+```
+
+```{r avoid_places_no_socdist}
+avoid_places_no_socdist.rf <- lm(avoid_places_no_socdist ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(avoid_places_no_socdist.rf)
+avoid_places_no_socdist.rf.data <- summary(avoid_places_no_socdist.rf)$coefficients
+
+avoid_places_no_socdist.rf.prom.b <- avoid_places_no_socdist.rf.data["prom", "Estimate"]
+avoid_places_no_socdist.rf.prom.se <- avoid_places_no_socdist.rf.data["prom", "Std. Error"]
+avoid_places_no_socdist.rf.prom.t <- avoid_places_no_socdist.rf.data["prom", "t value"]
+avoid_places_no_socdist.rf.prom.df <- round(summary(avoid_places_no_socdist.rf)$df[2], digits = 0)
+avoid_places_no_socdist.rf.prom.p <- avoid_places_no_socdist.rf.data["prom", "Pr(>|t|)"]
+avoid_places_no_socdist.rf.prom.or <- exp(avoid_places_no_socdist.rf.prom.b)
+
+avoid_places_no_socdist.rf.prev.b <- avoid_places_no_socdist.rf.data["prev", "Estimate"]
+avoid_places_no_socdist.rf.prev.se <- avoid_places_no_socdist.rf.data["prev", "Std. Error"]
+avoid_places_no_socdist.rf.prev.t <- avoid_places_no_socdist.rf.data["prev", "t value"]
+avoid_places_no_socdist.rf.prev.df <- round(summary(avoid_places_no_socdist.rf)$df[2], digits = 0)
+avoid_places_no_socdist.rf.prev.p <- avoid_places_no_socdist.rf.data["prev", "Pr(>|t|)"]
+avoid_places_no_socdist.rf.prev.or <- exp(avoid_places_no_socdist.rf.prev.b)
+
+confint(avoid_places_no_socdist.rf)
+```
+
+```{r clean_disinfect}
+clean_disinfect.rf <- lm(clean_disinfect ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(clean_disinfect.rf)
+clean_disinfect.rf.data <- summary(clean_disinfect.rf)$coefficients
+
+clean_disinfect.rf.prom.b <- clean_disinfect.rf.data["prom", "Estimate"]
+clean_disinfect.rf.prom.se <- clean_disinfect.rf.data["prom", "Std. Error"]
+clean_disinfect.rf.prom.t <- clean_disinfect.rf.data["prom", "t value"]
+clean_disinfect.rf.prom.df <- round(summary(clean_disinfect.rf)$df[2], digits = 0)
+clean_disinfect.rf.prom.p <- clean_disinfect.rf.data["prom", "Pr(>|t|)"]
+clean_disinfect.rf.prom.or <- exp(clean_disinfect.rf.prom.b)
+
+clean_disinfect.rf.prev.b <- clean_disinfect.rf.data["prev", "Estimate"]
+clean_disinfect.rf.prev.se <- clean_disinfect.rf.data["prev", "Std. Error"]
+clean_disinfect.rf.prev.t <- clean_disinfect.rf.data["prev", "t value"]
+clean_disinfect.rf.prev.df <- round(summary(clean_disinfect.rf)$df[2], digits = 0)
+clean_disinfect.rf.prev.p <- clean_disinfect.rf.data["prev", "Pr(>|t|)"]
+clean_disinfect.rf.prev.or <- exp(clean_disinfect.rf.prev.b)
+
+confint(clean_disinfect.rf)
+```
+
+### Perceived Covid-19 Threat Level
+
+```{r covid_threat_personal}
+covid_threat_personal.rf <- lm(covid_threat_personal ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(covid_threat_personal.rf)
+covid_threat_personal.rf.data <- summary(covid_threat_personal.rf)$coefficients
+
+covid_threat_personal.rf.prom.b <- covid_threat_personal.rf.data["prom", "Estimate"]
+covid_threat_personal.rf.prom.se <- covid_threat_personal.rf.data["prom", "Std. Error"]
+covid_threat_personal.rf.prom.t <- covid_threat_personal.rf.data["prom", "t value"]
+covid_threat_personal.rf.prom.df <- round(summary(covid_threat_personal.rf)$df[2], digits = 0)
+covid_threat_personal.rf.prom.p <- covid_threat_personal.rf.data["prom", "Pr(>|t|)"]
+
+covid_threat_personal.rf.prev.b <- covid_threat_personal.rf.data["prev", "Estimate"]
+covid_threat_personal.rf.prev.se <- covid_threat_personal.rf.data["prev", "Std. Error"]
+covid_threat_personal.rf.prev.t <- covid_threat_personal.rf.data["prev", "t value"]
+covid_threat_personal.rf.prev.df <- round(summary(covid_threat_personal.rf)$df[2], digits = 0)
+covid_threat_personal.rf.prev.p <- covid_threat_personal.rf.data["prev", "Pr(>|t|)"]
+
+confint(covid_threat_personal.rf)
+```
+
+```{r covid_threat_peers}
+covid_threat_peers.rf <- lm(covid_threat_peers ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+summary(covid_threat_peers.rf)
+covid_threat_peers.rf.data <- summary(covid_threat_peers.rf)$coefficients
+
+covid_threat_peers.rf.prom.b <- covid_threat_peers.rf.data["prom", "Estimate"]
+covid_threat_peers.rf.prom.se <- covid_threat_peers.rf.data["prom", "Std. Error"]
+covid_threat_peers.rf.prom.t <- covid_threat_peers.rf.data["prom", "t value"]
+covid_threat_peers.rf.prom.df <- round(summary(covid_threat_peers.rf)$df[2], digits = 0)
+covid_threat_peers.rf.prom.p <- covid_threat_peers.rf.data["prom", "Pr(>|t|)"]
+
+covid_threat_peers.rf.prev.b <- covid_threat_peers.rf.data["prev", "Estimate"]
+covid_threat_peers.rf.prev.se <- covid_threat_peers.rf.data["prev", "Std. Error"]
+covid_threat_peers.rf.prev.t <- covid_threat_peers.rf.data["prev", "t value"]
+covid_threat_peers.rf.prev.df <- round(summary(covid_threat_peers.rf)$df[2], digits = 0)
+covid_threat_peers.rf.prev.p <- covid_threat_peers.rf.data["prev", "Pr(>|t|)"]
+
+confint(covid_threat_peers.rf)
 ```

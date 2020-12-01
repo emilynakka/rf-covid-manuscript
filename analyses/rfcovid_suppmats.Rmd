@@ -4,7 +4,7 @@ author            : "[Author names redacted for blind peer review]"
 output:
   pdf_document:
     toc: true
-    toc_depth: 2
+    toc_depth: 3
 header-includes:
    - \usepackage[utf8]{inputenc}
    - \usepackage{float}
@@ -27,7 +27,6 @@ options(scipen = 999)
 library(papaja) # Required so that citations function correctly
 library(knitr) # Required for knitting
 library(readxl) # Required to load .xlsx file
-library(plyr) # Required for summarySE() function
 library(tidyverse) # Required for data cleaning
 library(broman) # Required for myround() function that doesn't truncate digits
 library(kableExtra) # Required to produce nice-looking tables
@@ -51,48 +50,13 @@ mythemeweb = theme_classic(base_size = 13) +
           axis.ticks = element_line(size = .5),
           axis.ticks.length=unit(-2, "mm"))
 theme_set(mythemeweb)
-
-# Define functions
-summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
-                      conf.interval=.95, .drop=TRUE) {
-
-    # New version of length which can handle NA's: if na.rm==T, don't count them
-    length2 <- function (x, na.rm=FALSE) {
-        if (na.rm) sum(!is.na(x))
-        else       length(x)
-    }
-
-    # This does the summary. For each group's data frame, return a vector with
-    # N, mean, and sd
-    datac <- plyr::ddply(data, groupvars, .drop=.drop,
-      .fun = function(xx, col) {
-        c(N    = length2(xx[[col]], na.rm=na.rm),
-          mean = mean   (xx[[col]], na.rm=na.rm),
-          sd   = sd     (xx[[col]], na.rm=na.rm)
-        )
-      },
-      measurevar
-    )
-
-    # Rename the "mean" column    
-    datac <- plyr::rename(datac, c("mean" = measurevar))
-
-    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
-
-    # Confidence interval multiplier for standard error
-    # Calculate t-statistic for confidence interval: 
-    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
-    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
-    datac$ci <- datac$se * ciMult
-
-    return(datac)
-}
 ```
 
 ```{r clean}
 # IMPORT DATA
 rf_2019 <- read.csv(file="data/RFQ_Dec2019.csv", header = TRUE)
 rf_2020 <- read_excel("data/RAW DATA BeSci Analytic Engine without zipcode.xlsx", col_names = TRUE)
+rf_2020b <- read_excel("data/Mindset Survey 1 Data 2020-08-13 Definitions TDJ.xlsx", col_names = TRUE)
 
 ## PREPARE DATA FOR CLEANING AND ANALYSIS
 
@@ -102,7 +66,7 @@ rf_2019 <- rf_2019[,3:24]
 # Rename location column
 rf_2019 <- dplyr::rename(rf_2019, state = location)
 
-# Remove second header line in 2020 data, then rename and grab numeric scores from columns
+# Remove second header line in 2020 Study 1 data, then rename and grab numeric scores from RFQ columns
 rf_2020 <- rf_2020 %>%
   dplyr::filter(RESP_GENDER != "Gender") %>%
   dplyr::rename(gender = RESP_GENDER,
@@ -124,10 +88,10 @@ rf_2020 <- rf_2020 %>%
                 obtainprotect_moremot = Q2061616163,
                 foodest_open = Q2078453979,
                 foodest_been = Q2015373138,
-                foodest_plan = Q2067606070,
+                foodest_l = Q2067606070,
                 salon_open = Q2029531417,
                 salon_been = Q2077930763,
-                salon_plan = Q2098211869,
+                salon_l = Q2098211869,
                 vitamins = Q2004035326,
                 timewithpet = Q2063144300,
                 computer_me = Q2071690348__1,
@@ -169,12 +133,167 @@ rf_2020$rfq_11 <- str_extract(rf_2020$rfq_11, "^.{1}")
 
 rf_2020$state <- str_sub(rf_2020$state, start= -2)
 
-# Convert RFQ columns to numeric in rf_2020
-num <- c("rfq_1", "rfq_2", "rfq_3", "rfq_4", "rfq_5", "rfq_6", 
-         "rfq_7", "rfq_8", "rfq_9", "rfq_10", "rfq_11") # Define numeric columns
-rf_2020[num] <- lapply(rf_2020[num], as.character) # Convert numeric columns to character (before numeric) to prevent values from changing
-rf_2020[num] <- lapply(rf_2020[num], as.numeric) # Convert numeric columns to numeric
-rm(num) # Clear mfraw.num from workspace as it is no longer needed
+# Do the same for 2020 Study 2 data
+rf_2020b <- rf_2020b %>%
+  dplyr::filter(RESP_GENDER != "Gender") %>%
+  dplyr::rename(gender = RESP_GENDER,
+                state = SCREENER1,
+                travel_car = "Q2032311582 (Gone on a roadtrip in a car)",
+                travel_air = "Q2032311582 (Traveled by airplane)",
+                travel_pubtrans = "Q2032311582 (Taken local public transportation (eg bus subwa",
+                travel_rideshare = "Q2032311582 (Taken ridesharing services (eg Uber Lyft))",
+                travel_taxi = "Q2032311582 (Taken a taxi)",
+                stay_hotel = "Q2032311582 (Stayed in a hotel)",
+                stay_rental = "Q2032311582 (Stayed in a vacation rental (eg Airbnb))",
+                travel_car_l = "Q2040372016 (Go on a roadtrip in a car)",
+                travel_air_l = "Q2040372016 (Travel by airplane)",
+                travel_pubtrans_l = "Q2040372016 (Take local public transportation (eg bus subway",
+                travel_rideshare_l = "Q2040372016 (Take ridesharing services (eg Uber Lyft))",
+                travel_taxi_l = "Q2040372016 (Take a taxi)",
+                stay_hotel_l = "Q2040372016 (Stay in a hotel)",
+                stay_rental_l = "Q2040372016 (Stay in a vacation rental (eg Airbnb))",
+                out_restaurant = "Q2038689152 (Gone out to a restaurant with friends/family)",
+                out_publicevent = "Q2038689152 (Gone out to an event in public with friends/fam",
+                out_bar = "Q2038689152 (Gone out to a bar with friends/family)",
+                out_largegathering = "Q2038689152 (Gone out to a large gathering (eg more than 10",
+                drank_home = "Q2038689152 (Drank alcoholic beverages at home)",
+                online_gathering = "Q2038689152 (Participated in an online social gathering (eg",
+                out_restaurant_l = "Q2027016490 (Go out to a restaurant with friends/family)",
+                out_publicevent_l = "Q2027016490 (Go out to an event in public with friends/famil",
+                out_bar_l = "Q2027016490 (Go out to a bar with friends/family)",
+                out_largegathering_l = "Q2027016490 (Go out to a large gathering (eg more than 10 pe",
+                drink_home_l = "Q2027016490 (Drink alcoholic beverages at home)",
+                online_gathering_l = "Q2027016490 (Participate in an online social gathering (eg Z",
+                shop_mall = "Q2007850037 (Gone to a shopping mall)",
+                shop_grocery = "Q2007850037 (Gone to a grocery store)",
+                order_grocery_delivery = "Q2007850037 (Ordered groceries online for delivery)",
+                order_grocery_pickup = "Q2007850037 (Ordered groceries online for pickup)",
+                new_prod_brand = "Q2007850037 (Tried a new product or brand for the first time",
+                shop_nonessential_instore = "Q2007850037 (Shopped for non-essential items in a store)",
+                shop_nonessential_online = "Q2007850037 (Shopped for non-essential items online)",
+                shop_mall_l = "Q2074949376 (Go to a shopping mall)",
+                shop_grocery_l = "Q2074949376 (Go to a grocery store)",
+                order_grocery_delivery_l = "Q2074949376 (Order groceries online for delivery)",
+                order_grocery_pickup_l = "Q2074949376 (Order groceries online for pickup)",
+                new_prod_brand_l = "Q2074949376 (Try a new product or brand for the first time)",
+                shop_nonessential_instore_l = "Q2074949376 (Shop for non-essential items in a store)",
+                shop_nonessential_online_l = "Q2074949376 (Shop for non-essential items online)",
+                wash_hands_sanitizer = "Q2094454301 (I always wash hands or use hand sanitizer as so",
+                wear_mask_self_family = "Q2094454301 (I wear masks whenever I leave my house to prote",
+                wear_mask_others = "Q2094454301b (I wear masks whenever I leave my house to prote",
+                wear_gloves = "Q2094454301 (I wear gloves whenever I leave my house)",
+                social_distancing = "Q2094454301 (I practice social distancing whenever I leave m",
+                avoid_places_no_socdist = "Q2094454301 (I avoid going to places that do not enforce soc",
+                clean_disinfect = "Q2094454301 (I regularly clean and disinfect my home)",
+                tested_covid = "Q2019985903 (Have you been tested for Covid-19 (or antibodie",
+                tested_covid_l = "Q2019985903 (Do you plan to get tested for Covid-19 (or anti",
+                covid_threat_personal = "Q2040189607 (What level of threat do you think Covid-19 pose",
+                covid_threat_peers = "Q2040189607 (What level of threat do you think Covid-19 pose2",
+                life_return_normal = "Q2005528889",
+                rfq_1 = "Q2014987959 (Compared to most people are you typically unabl",
+                rfq_2 = "Q2014987959 (Do you often do well at different things that y",
+                rfq_3 = "Q2014987959 (Not being careful enough has gotten me into tro",
+                rfq_4 = "Q2014987959 (Growing up did you ever act in ways that your p",
+                rfq_5 = "Q2014987959 (Did you get on your parents’ nerves often when",
+                rfq_6 = "Q2014987959 (Growing up would you ever “cross the line” by d",
+                rfq_7 = "Q2011014226 (I feel like I have made progress toward being s",
+                rfq_8 = "Q2011014226 (I have found very few hobbies or activities in",
+                rfq_9 = "Q2076338533",
+                rfq_10 = "Q2058289486",
+                rfq_11 = "Q2031600708",
+                ach_pos_outcomes = "Q2087337059 (I tend to focus on achieving positive outcomes)",
+                avoid_neg_cons = "Q2087337059 (I tend to focus on avoiding negative consequenc",
+                ach_new_exps = "Q2087337059 (I tend to focus on achieving new experiences)",
+                duties_oblig = "Q2087337059 (I tend to focus on my duties and obligations)",
+                get_to_do = "Q2087337059 (I tend to focus on things I get to do)",
+                have_to_do = "Q2087337059 (I tend to focus on things I have to do)",
+                proper_behavior = "Q2016440512 (It is my feeling that if everyone else in a gro",
+                avoid_outofstyle = "Q2016440512 (I actively avoid wearing clothes that are not i",
+                parties_fit_in = "Q2016440512 (At parties I usually try to behave in a manner",
+                uncertain_look_to_others = "Q2016440512 (When I am uncertain how to act in a social situ",
+                avoid_outofplace = "Q2016440512 (I try to pay attention to the reactions of othe",
+                slang = "Q2016440512 (I find that I tend to pick up slang expressions",
+                what_others_wear = "Q2016440512 (I tend to pay attention to what others are wear",
+                disapproval_change = "Q2090610647 (The slightest look of disapproval in the eyes o",
+                imp_fit_in = "Q2090610647 (Its important to me to fit into the group Im wi",
+                beh_depends_on_others = "Q2090610647 (My behavior often depends on how I feel others",
+                uncertain_look_to_others2 = "Q2090610647 (If I am the least bit uncertain as to how to ac",
+                keep_up_clothing = "Q2090610647 (I usually keep up with clothing style changes b",
+                not_follow_crowd = "Q2090610647 (When in a social situation I tend not to follow",
+                risks_fun = "Q2017707446 (Taking risks makes life more fun)",
+                risk_taker = "Q2017707446 (My friends would say that Im a risk taker)",
+                enjoy_risk = "Q2017707446 (I enjoy taking risks in most aspects of my life",
+                risk_even_if_hurt = "Q2017707446 (I would take a risk even if it meant I might ge",
+                risks_imp = "Q2017707446 (Taking risks is an important part of my life)",
+                common_risky_dec = "Q2017707446 (I commonly make risky decisions)",
+                believe_taking_chances = "Q2017707446 (I am a believer of taking chances)",
+                attracted_by_risk = "Q2017707446 (I am attracted rather than scared by risk)",
+                people_listen = "Q2060172177 (I can get people to listen to what I say)",
+                wishes_dont_carry_weight = "Q2060172177 (My wishes do not carry much weight)",
+                get_others_todo = "Q2060172177 (I can get others to do what I want)",
+                views_little_sway = "Q2060172177 (Even if I voice them my views have little sway)",
+                have_power = "Q2060172177 (I think I have a great deal of power)",
+                ideas_op_ignored = "Q2060172177 (My ideas and opinions are often ignored)",
+                unable_get_way = "Q2060172177 (Even when I try I am not able to get my way)",
+                make_decisions = "Q2060172177 (If I want to I get to make the decisions)",
+                age = "Q2022382998",
+                ethnicity = "Q2038877242",
+                pol_orient = "Q2058714381",
+                education = "Q2066913167",
+                income = "Q2035596434")
+rf_2020b$rfq_1 <- str_extract(rf_2020b$rfq_1, "^.{1}")
+rf_2020b$rfq_2 <- str_extract(rf_2020b$rfq_2, "^.{1}")
+rf_2020b$rfq_3 <- str_extract(rf_2020b$rfq_3, "^.{1}")
+rf_2020b$rfq_4 <- str_extract(rf_2020b$rfq_4, "^.{1}")
+rf_2020b$rfq_5 <- str_extract(rf_2020b$rfq_5, "^.{1}")
+rf_2020b$rfq_6 <- str_extract(rf_2020b$rfq_6, "^.{1}")
+rf_2020b$rfq_7 <- str_extract(rf_2020b$rfq_7, "^.{1}")
+rf_2020b$rfq_8 <- str_extract(rf_2020b$rfq_8, "^.{1}")
+rf_2020b$rfq_9 <- str_extract(rf_2020b$rfq_9, "^.{1}")
+rf_2020b$rfq_10 <- str_extract(rf_2020b$rfq_10, "^.{1}")
+rf_2020b$rfq_11 <- str_extract(rf_2020b$rfq_11, "^.{1}")
+
+# Grab text labels for demographic columns
+rf_2020b$ethnicity <- str_sub(rf_2020b$ethnicity, start = 5)
+rf_2020b$pol_orient <- str_sub(rf_2020b$pol_orient, start = 5)
+rf_2020b$education <- str_sub(rf_2020b$education, start = 5)
+rf_2020b$income <- str_sub(rf_2020b$income, start = 5)
+
+# Recode demographics in 2020 Study 2 data to match 2020 Study 1 coding
+rf_2020b$pol_orient <- case_when(rf_2020b$pol_orient == "Very conservative" ~ "Strongly Conservative",
+                            rf_2020b$pol_orient == "Very liberal" ~ "Strongly Liberal",
+                            rf_2020b$pol_orient == "Conservative" ~ "Conservative",
+                            rf_2020b$pol_orient == "Liberal" ~ "Liberal",
+                            rf_2020b$pol_orient == "Slightly conservative" ~ "Slightly Conservative",
+                            rf_2020b$pol_orient == "Slightly liberal" ~ "Slightly Liberal",
+                            rf_2020b$pol_orient == "Moderate" ~ "Moderate")
+rf_2020b$agegroup <- case_when(rf_2020b$age < 25 ~ "18 - 24",
+                              rf_2020b$age < 35 ~ "25 - 34",
+                              rf_2020b$age < 45 ~ "35 - 44",
+                              rf_2020b$age < 55 ~ "45 - 54",
+                              rf_2020b$age < 65 ~ "55 - 64",
+                              rf_2020b$age >= 65 ~ "65 or older")
+rf_2020b$education <- case_when(rf_2020b$education == "Elementary School" ~ "Other",
+                            rf_2020b$education == "Some High School" ~ "Other",
+                            rf_2020b$education == "High School Graduate or GED" ~ "High School Diploma",
+                            rf_2020b$education == "Some College" ~ "High School Diploma",
+                            rf_2020b$education == "Associate Degree" ~ "Associates Degree",
+                            rf_2020b$education == "Bachelor’s Degree" ~ "Bachelors Degree",
+                            rf_2020b$education == "Master’s Degree" ~ "Graduate Degree",
+                            rf_2020b$education == "MD, JD, PhD" ~ "Graduate Degree")
+rf_2020b$income <- case_when(rf_2020b$income == "$0-$10,000" ~ "$0 - $10,000",
+                            rf_2020b$income == "$10,001 - $20,000" ~ "$10,000 - $20,000",
+                            rf_2020b$income == "$20,001 - $40,000" ~ "$20,001 - $40,000",
+                            rf_2020b$income == "$40,001 - $70,000" ~ "$40,001 - $70,000",
+                            rf_2020b$income == "$70,001 - $100,000" ~ "$70,001 - $100,000",
+                            rf_2020b$income == "$100,001 - $250,000" ~ "$100,001 - $250,000",
+                            rf_2020b$income == "$250,001+" ~ "$250,001+")
+
+# Add study month columns and then merge dataframes
+rf_2020$month <- "Jun"
+rf_2020b$month <- "July"
+rf_2020 <- merge(rf_2020, rf_2020b, all = T)
+rm(rf_2020b)
 
 # Calculate agegroup in 2019 data (consistent with 2020 age group levels)
 rf_2019$agegroup <- case_when(rf_2019$age < 25 ~ "18 - 24",
@@ -208,9 +327,16 @@ rf_2019$pol_orient <- case_when(rf_2019$pol_orient == "Very Conservative" ~ "Str
                             rf_2019$pol_orient == "Slightly Liberal" ~ "Slightly Liberal",
                             rf_2019$pol_orient == "Moderate" ~ "Moderate")
 
-# Add study year columns and then merge dataframes
-rf_2019$year <- "2019"
-rf_2020$year <- "2020"
+# Convert RFQ columns to numeric in rf_2020
+num <- c("rfq_1", "rfq_2", "rfq_3", "rfq_4", "rfq_5", "rfq_6", 
+         "rfq_7", "rfq_8", "rfq_9", "rfq_10", "rfq_11") # Define numeric columns
+rf_2020[num] <- lapply(rf_2020[num], as.character) # Convert numeric columns to character (before numeric) to prevent values from changing
+rf_2020[num] <- lapply(rf_2020[num], as.numeric) # Convert numeric columns to numeric
+rm(num) # Clear mfraw.num from workspace as it is no longer needed
+
+# Add pre vs. post Covid column and then merge dataframes
+rf_2019$covid <- "Pre-Covid"
+rf_2020$covid <- "Post-Covid"
 rf <- bind_rows(rf_2019, rf_2020)
 rm(rf_2019, rf_2020)
 
@@ -223,150 +349,262 @@ rf$prom <- ((6-rf$rfq_1) + rf$rfq_3 + rf$rfq_7 + (6-rf$rfq_9) +
 # Calculate promotion dominance scores
 rf$promdom <- rf$prom - rf$prev
 
-# Dummy-code year
-rf$year.d <- NA
-rf$year.d[rf$year == 2019] <- 0
-rf$year.d[rf$year == 2020] <- 1
+# Dummy-code pre vs. post Covid
+rf$covid.d <- NA
+rf$covid.d[rf$covid == "Pre-Covid"] <- 0
+rf$covid.d[rf$covid == "Post-Covid"] <- 1
 
-# Create an ordinal numeric version of the political orientation variable
-rf$pol_orient.num <- recode(rf$pol_orient, `Strongly Conservative` = 1, 
+# Create ordered factor version of Covid variable for plotting
+rf$covidF <- factor(rf$covid, levels = c("Pre-Covid", "Post-Covid"), ordered = TRUE)
+
+# Create an ordinal numeric version of the political orientation variable and mean-center
+rf$pol_orient.num <- dplyr::recode(rf$pol_orient, `Strongly Conservative` = 1, 
                             `Conservative` = 2, `Slightly Conservative` = 3, 
                             `Moderate` = 4, `Slightly Liberal` = 5, 
                             `Liberal` = 6, `Strongly Liberal` = 7, .default = NA_real_)
+rf$pol_orient.num.c <- as.numeric(scale(rf$pol_orient.num, center = TRUE, scale = FALSE))
 
-# Create an ordinal numeric version of the age group variable
-rf$agegroup.num <- recode(rf$agegroup, `18 - 24` = 1, `25 - 34` = 2, 
+# Create an ordinal numeric version of the age group variable and mean-center
+rf$agegroup.num <- dplyr::recode(rf$agegroup, `18 - 24` = 1, `25 - 34` = 2, 
                           `35 - 44` = 3, `45 - 54` = 4, `55 - 64` = 5, 
                           `65 or older` = 6, .default = NA_real_)
+rf$agegroup.num.c <- as.numeric(scale(rf$agegroup.num, center = TRUE, scale = FALSE))
 
-# Dummy-code behavioral outcome variables
+## DUMMY-CODE BEHAVIORAL OUTCOME VARIABLES (2020 Study 1)
+
 rf$foodest_open_certain.d <- case_when(rf$foodest_open == "Yes" ~ 1,
                                rf$foodest_open == "Uncertain" ~ 0,
                                rf$foodest_open == "No" ~ 1)
 rf$foodest_been.d <- case_when(rf$foodest_been == "Yes" ~ 1,
                                rf$foodest_been == "Does not apply" ~ 0,
                                rf$foodest_been == "No" ~ 0)
-rf$foodest_plan.d <- case_when(rf$foodest_plan == "Yes" ~ 1,
-                               rf$foodest_plan == "No" ~ 0)
+rf$foodest_l.d <- case_when(rf$foodest_l == "Yes" ~ 1,
+                               rf$foodest_l == "No" ~ 0)
 rf$salon_open_certain.d <- case_when(rf$salon_open == "Yes" ~ 1,
                              rf$salon_open == "Uncertain" ~ 0,
                              rf$salon_open == "No" ~ 1)
 rf$salon_been.d <- case_when(rf$salon_been == "Yes" ~ 1,
                              rf$salon_been == "Does not apply" ~ 0,
                              rf$salon_been == "No" ~ 0)
-rf$salon_plan.d <- case_when(rf$salon_plan == "Yes" ~ 1,
-                             rf$salon_plan == "No" ~ 0)
+rf$salon_l.d <- case_when(rf$salon_l == "Yes" ~ 1,
+                             rf$salon_l == "No" ~ 0)
 rf$vitamins_current.d <- case_when(rf$vitamins == "Currently using" ~ 1,
                                rf$vitamins == "Considering using" ~ 0,
                                rf$vitamins == "Not considering using" ~ 0)
 rf$frozenfood.d <- case_when(rf$frozenfood == "Yes" ~ 1,
                              rf$frozenfood == "No" ~ 0)
 
-# Create subsets where needed for analyses
+# Create Study 1 subsets where needed for analyses
 foodest <- filter(rf, foodest_open == "Yes" | foodest_open == "Uncertain") # n = 365
 salon <- filter(rf, salon_open == "Yes" | salon_open == "Uncertain") # n = 412
 
-# Subset 2019 and 2020
-rf_2019 <- dplyr::filter(rf, year == 2019)
-rf_2020 <- dplyr::filter(rf, year == 2020)
+
+## EXTRACT NUMERIC DATA FOR BEHAVIORAL OUTCOME VARIABLES (2020 Study 2)
+
+# 1 = yes, 2 = no
+rf$travel_car <- str_to_title(str_sub(rf$travel_car, start = 5))
+rf$travel_air <- str_to_title(str_sub(rf$travel_air, start = 5))
+rf$travel_pubtrans <- str_to_title(str_sub(rf$travel_pubtrans, start = 5))
+rf$travel_rideshare <- str_to_title(str_sub(rf$travel_rideshare, start = 5))
+rf$travel_taxi <- str_to_title(str_sub(rf$travel_taxi, start = 5))
+rf$stay_hotel <- str_to_title(str_sub(rf$stay_hotel, start = 5))
+rf$stay_rental <- str_to_title(str_sub(rf$stay_rental, start = 5))
+rf$out_restaurant <- str_to_title(str_sub(rf$out_restaurant, start = 5))
+rf$out_publicevent <- str_to_title(str_sub(rf$out_publicevent, start = 5))
+rf$out_bar <- str_to_title(str_sub(rf$out_bar, start = 5))
+rf$out_largegathering <- str_to_title(str_sub(rf$out_largegathering, start = 5))
+rf$drank_home <- str_to_title(str_sub(rf$drank_home, start = 5))
+rf$online_gathering <- str_to_title(str_sub(rf$online_gathering, start = 5))
+rf$shop_mall <- str_to_title(str_sub(rf$shop_mall, start = 5))
+rf$shop_grocery <- str_to_title(str_sub(rf$shop_grocery, start = 5))
+rf$order_grocery_delivery <- str_to_title(str_sub(rf$order_grocery_delivery, start = 5))
+rf$order_grocery_pickup <- str_to_title(str_sub(rf$order_grocery_pickup, start = 5))
+rf$new_prod_brand <- str_to_title(str_sub(rf$new_prod_brand, start = 5))
+rf$shop_nonessential_instore <- str_to_title(str_sub(rf$shop_nonessential_instore, start = 5))
+rf$shop_nonessential_online <- str_to_title(str_sub(rf$shop_nonessential_online, start = 5))
+rf$tested_covid <- str_to_title(str_sub(rf$tested_covid, start = 5))
+rf$tested_covid_l <- str_to_title(str_sub(rf$tested_covid_l, start = 5))
+
+# 1 = very unlikely, 7 = very likely
+rf$travel_car_l <- str_extract(rf$travel_car_l, "^.{1}")
+rf$travel_air_l <- str_extract(rf$travel_air_l, "^.{1}")
+rf$travel_pubtrans_l <- str_extract(rf$travel_pubtrans_l, "^.{1}")
+rf$travel_rideshare_l <- str_extract(rf$travel_rideshare_l, "^.{1}")
+rf$travel_taxi_l <- str_extract(rf$travel_taxi_l, "^.{1}")
+rf$stay_hotel_l <- str_extract(rf$stay_hotel_l, "^.{1}")
+rf$stay_rental_l <- str_extract(rf$stay_rental_l, "^.{1}")
+rf$out_restaurant_l <- str_extract(rf$out_restaurant_l, "^.{1}")
+rf$out_publicevent_l <- str_extract(rf$out_publicevent_l, "^.{1}")
+rf$out_bar_l <- str_extract(rf$out_bar_l, "^.{1}")
+rf$out_largegathering_l <- str_extract(rf$out_largegathering_l, "^.{1}")
+rf$drink_home_l <- str_extract(rf$drink_home_l, "^.{1}")
+rf$online_gathering_l <- str_extract(rf$online_gathering_l, "^.{1}")
+rf$shop_mall_l <- str_extract(rf$shop_mall_l, "^.{1}")
+rf$shop_grocery_l <- str_extract(rf$shop_grocery_l, "^.{1}")
+rf$order_grocery_delivery_l <- str_extract(rf$order_grocery_delivery_l, "^.{1}")
+rf$order_grocery_pickup_l <- str_extract(rf$order_grocery_pickup_l, "^.{1}")
+rf$new_prod_brand_l <- str_extract(rf$new_prod_brand_l, "^.{1}")
+rf$shop_nonessential_instore_l <- str_extract(rf$shop_nonessential_instore_l, "^.{1}")
+rf$shop_nonessential_online_l <- str_extract(rf$shop_nonessential_online_l, "^.{1}")
+
+# 1 = strongly disagree, 7 = strongly agree
+rf$wash_hands_sanitizer <- str_extract(rf$wash_hands_sanitizer, "^.{1}")
+rf$wear_mask_self_family <- str_extract(rf$wear_mask_self_family, "^.{1}")
+rf$wear_mask_others <- str_extract(rf$wear_mask_others, "^.{1}")
+rf$wear_gloves <- str_extract(rf$wear_gloves, "^.{1}")
+rf$social_distancing <- str_extract(rf$social_distancing, "^.{1}")
+rf$avoid_places_no_socdist <- str_extract(rf$avoid_places_no_socdist, "^.{1}")
+rf$clean_disinfect <- str_extract(rf$clean_disinfect, "^.{1}")
+rf$risks_fun <- str_extract(rf$risks_fun, "^.{1}")
+rf$risk_taker <- str_extract(rf$risk_taker, "^.{1}")
+rf$enjoy_risk <- str_extract(rf$enjoy_risk, "^.{1}")
+rf$risk_even_if_hurt <- str_extract(rf$risk_even_if_hurt, "^.{1}")
+rf$risks_imp <- str_extract(rf$risks_imp, "^.{1}")
+rf$common_risky_dec <- str_extract(rf$common_risky_dec, "^.{1}")
+rf$believe_taking_chances <- str_extract(rf$believe_taking_chances, "^.{1}")
+rf$attracted_by_risk <- str_extract(rf$attracted_by_risk, "^.{1}")
+rf$people_listen <- str_extract(rf$people_listen, "^.{1}")
+rf$wishes_dont_carry_weight <- str_extract(rf$wishes_dont_carry_weight, "^.{1}")
+rf$get_others_todo <- str_extract(rf$get_others_todo, "^.{1}")
+rf$views_little_sway <- str_extract(rf$views_little_sway, "^.{1}")
+rf$have_power <- str_extract(rf$have_power, "^.{1}")
+rf$ideas_op_ignored <- str_extract(rf$ideas_op_ignored, "^.{1}")
+rf$unable_get_way <- str_extract(rf$unable_get_way, "^.{1}")
+rf$make_decisions <- str_extract(rf$make_decisions, "^.{1}")
+
+# 1 = very low threat, 7 = very high threat
+rf$covid_threat_personal <- str_extract(rf$covid_threat_personal, "^.{1}")
+rf$covid_threat_peers <- str_extract(rf$covid_threat_peers, "^.{1}")
+
+rf$state <- str_sub(rf$state, start= -2)
+
+# 1 = strongly disagree, 5 = strongly agree
+rf$ach_pos_outcomes <- str_extract(rf$ach_pos_outcomes, "^.{1}")
+rf$avoid_neg_cons <- str_extract(rf$avoid_neg_cons, "^.{1}")
+rf$ach_new_exps <- str_extract(rf$ach_new_exps, "^.{1}")
+rf$duties_oblig <- str_extract(rf$duties_oblig, "^.{1}")
+rf$get_to_do <- str_extract(rf$get_to_do, "^.{1}")
+rf$have_to_do <- str_extract(rf$have_to_do, "^.{1}")
+
+# 1 = always false, 7 = always true
+rf$proper_behavior <- str_extract(rf$proper_behavior, "^.{1}")
+rf$avoid_outofstyle <- str_extract(rf$avoid_outofstyle, "^.{1}")
+rf$parties_fit_in <- str_extract(rf$parties_fit_in, "^.{1}")
+rf$uncertain_look_to_others <- str_extract(rf$uncertain_look_to_others, "^.{1}")
+rf$avoid_outofplace <- str_extract(rf$avoid_outofplace, "^.{1}")
+rf$slang <- str_extract(rf$slang, "^.{1}")
+rf$what_others_wear <- str_extract(rf$what_others_wear, "^.{1}")
+rf$disapproval_change <- str_extract(rf$disapproval_change, "^.{1}")
+rf$imp_fit_in <- str_extract(rf$imp_fit_in, "^.{1}")
+rf$beh_depends_on_others <- str_extract(rf$beh_depends_on_others, "^.{1}")
+rf$uncertain_look_to_others2 <- str_extract(rf$uncertain_look_to_others2, "^.{1}")
+rf$keep_up_clothing <- str_extract(rf$keep_up_clothing, "^.{1}")
+rf$not_follow_crowd <- str_extract(rf$not_follow_crowd, "^.{1}")
+
+# Recode life_return_normal columns
+rf$life_return_normal <- case_when(rf$life_return_normal == "It has already been contained" ~ 1,
+                             rf$life_return_normal == "1-2 months from now" ~ 2,
+                             rf$life_return_normal == "3-5 months from now" ~ 3,
+                             rf$life_return_normal == "6-8 months from now " ~ 4,
+                             rf$life_return_normal == "9-12 months from now" ~ 5,
+                             rf$life_return_normal == "More than 12 months from now" ~ 6)
+
+# Dummy-code 2020 Study 2 behavioral outcome variables
+rf$travel_car.d <- case_when(rf$travel_car == "Yes" ~ 1,
+                             rf$travel_car == "No" ~ 0)
+rf$travel_air.d <- case_when(rf$travel_air == "Yes" ~ 1,
+                             rf$travel_air == "No" ~ 0)
+rf$travel_pubtrans.d <- case_when(rf$travel_pubtrans == "Yes" ~ 1,
+                             rf$travel_pubtrans == "No" ~ 0)
+rf$travel_rideshare.d <- case_when(rf$travel_rideshare == "Yes" ~ 1,
+                             rf$travel_rideshare == "No" ~ 0)
+rf$travel_taxi.d <- case_when(rf$travel_taxi == "Yes" ~ 1,
+                             rf$travel_taxi == "No" ~ 0)
+rf$stay_hotel.d <- case_when(rf$stay_hotel == "Yes" ~ 1,
+                             rf$stay_hotel == "No" ~ 0)
+rf$stay_rental.d <- case_when(rf$stay_rental == "Yes" ~ 1,
+                             rf$stay_rental == "No" ~ 0)
+rf$out_restaurant.d <- case_when(rf$out_restaurant == "Yes" ~ 1,
+                             rf$out_restaurant == "No" ~ 0)
+rf$out_publicevent.d <- case_when(rf$out_publicevent == "Yes" ~ 1,
+                             rf$out_publicevent == "No" ~ 0)
+rf$out_bar.d <- case_when(rf$out_bar == "Yes" ~ 1,
+                             rf$out_bar == "No" ~ 0)
+rf$out_largegathering.d <- case_when(rf$out_largegathering == "Yes" ~ 1,
+                             rf$out_largegathering == "No" ~ 0)
+rf$drank_home.d <- case_when(rf$drank_home == "Yes" ~ 1,
+                             rf$drank_home == "No" ~ 0)
+rf$online_gathering.d <- case_when(rf$online_gathering == "Yes" ~ 1,
+                             rf$online_gathering == "No" ~ 0)
+rf$shop_mall.d <- case_when(rf$shop_mall == "Yes" ~ 1,
+                             rf$shop_mall == "No" ~ 0)
+rf$shop_grocery.d <- case_when(rf$shop_grocery == "Yes" ~ 1,
+                             rf$shop_grocery == "No" ~ 0)
+rf$order_grocery_delivery.d <- case_when(rf$order_grocery_delivery == "Yes" ~ 1,
+                             rf$order_grocery_delivery == "No" ~ 0)
+rf$order_grocery_pickup.d <- case_when(rf$order_grocery_pickup == "Yes" ~ 1,
+                             rf$order_grocery_pickup == "No" ~ 0)
+rf$new_prod_brand.d <- case_when(rf$new_prod_brand == "Yes" ~ 1,
+                             rf$new_prod_brand == "No" ~ 0)
+rf$shop_nonessential_instore.d <- case_when(rf$shop_nonessential_instore == "Yes" ~ 1,
+                             rf$shop_nonessential_instore == "No" ~ 0)
+rf$shop_nonessential_online.d <- case_when(rf$shop_nonessential_online == "Yes" ~ 1,
+                             rf$shop_nonessential_online == "No" ~ 0)
+rf$tested_covid.d <- case_when(rf$tested_covid == "Yes" ~ 1,
+                             rf$tested_covid == "No" ~ 0)
+rf$tested_covid_l.d <- case_when(rf$tested_covid_l == "Yes" ~ 1,
+                             rf$tested_covid_l == "No" ~ 0)
+
+# Create numeric month variable
+rf$month.num[rf$covid == "Pre-Covid"] <- 1 # December 2019
+rf$month.num[rf$covid == "Post-Covid" & rf$month == "Jun"] <- 7 # June 2020
+rf$month.num[rf$covid == "Post-Covid" & rf$month == "July"] <- 8 # July 2020
+
+# Make character month variable an ordered factor
+rf$month <- factor(rf$month, levels=c("Jun", "July"), ordered=TRUE)
+
+# Convert numeric columns to numeric
+num <- c("ach_pos_outcomes", "rf_moremot", "obtainprotect_moremot", "travel_car_l", "travel_air_l", "travel_pubtrans_l", "travel_rideshare_l", "travel_taxi_l", "stay_hotel_l", "stay_rental_l", "out_restaurant_l", "out_publicevent_l", "out_bar_l", "out_largegathering_l", "drink_home_l", "online_gathering_l", "shop_mall_l", "shop_grocery_l", "order_grocery_delivery_l", "order_grocery_pickup_l", "new_prod_brand_l", "shop_nonessential_instore_l", "shop_nonessential_online_l", "wash_hands_sanitizer", "wear_mask_self_family", "wear_mask_others", "wear_gloves", "social_distancing", "avoid_places_no_socdist", "clean_disinfect", "covid_threat_personal", "covid_threat_peers", "life_return_normal", "avoid_neg_cons", "ach_new_exps", "duties_oblig", "get_to_do", "have_to_do", "proper_behavior", "avoid_outofstyle", "parties_fit_in", "uncertain_look_to_others", "avoid_outofplace", "slang", "what_others_wear", "disapproval_change", "imp_fit_in", "beh_depends_on_others", "uncertain_look_to_others2", "keep_up_clothing", "not_follow_crowd", "risks_fun", "risk_taker", "enjoy_risk", "risk_even_if_hurt", "risks_imp", "common_risky_dec", "believe_taking_chances", "attracted_by_risk", "people_listen", "wishes_dont_carry_weight", "get_others_todo", "views_little_sway", "have_power", "ideas_op_ignored", "unable_get_way", "make_decisions", "age") # Define numeric columns
+rf[num] <- lapply(rf[num], as.character) # Convert numeric columns to character (before numeric) to prevent values from changing
+rf[num] <- lapply(rf[num], as.numeric) # Convert numeric columns to numeric
+rm(num) # Clear mfraw.num from workspace as it is no longer needed
+
+## CREATE 2019 AND 2020 SUBSETS
+
+rf_2019 <- dplyr::filter(rf, covid == "Pre-Covid")
+rf_2020 <- dplyr::filter(rf, covid == "Post-Covid")
+rf_2020a <- dplyr::filter(rf, covid == "Post-Covid" & month == "Jun")
+rf_2020b <- dplyr::filter(rf, covid == "Post-Covid" & month == "July")
 ```
 
-```{r rf_2019_ps}
-# Gender
-male <- sum(rf_2019$gender == "Male", na.rm = T) # n = 143
-female <- sum(rf_2019$gender == "Female", na.rm = T) # n = 135
-malepct <- round(male/nrow(rf_2019)*100, digits = 0) # 51%
-femalepct <- round(female/nrow(rf_2019)*100, digits = 0) # 48%
+\newpage
 
-# Age Group
-eighteen24 <- round(nrow(filter(rf_2019, agegroup == "18 - 24"))/
-                      nrow(rf_2019)*100, digits = 0) # 8%
-twentyfive34 <- round(nrow(filter(rf_2019, agegroup == "25 - 34"))/
-                        nrow(rf_2019)*100, digits = 0) # 42%
-thirtyfive44 <- round(nrow(filter(rf_2019, agegroup == "35 - 44"))/
-                        nrow(rf_2019)*100, digits = 0) # 29%
-fortyfive54 <- round(nrow(filter(rf_2019, agegroup == "45 - 54"))/
-                       nrow(rf_2019)*100, digits = 0) # 12%
-fiftyfive64 <- round(nrow(filter(rf_2019, agegroup == "55 - 64"))/
-                       nrow(rf_2019)*100, digits = 0) # 6%
-sixtyfiveplus <- round(nrow(filter(rf_2019, agegroup == "65 or older"))/
-                         nrow(rf_2019)*100, digits = 0) # 3%
+# Study Materials and Procedures Beyond RFQ and Demographic Questionnaires
 
-# Political Orientation
-stronglycons <- round(nrow(filter(rf_2019, pol_orient == "Strongly Conservative"))/
-                        nrow(rf_2019)*100, digits = 0) # 4%
-cons <- round(nrow(filter(rf_2019, pol_orient == "Conservative"))/
-                nrow(rf_2019)*100, digits = 0) # 11%
-slightlycons <- round(nrow(filter(rf_2019, pol_orient == "Slightly Conservative"))/
-                        nrow(rf_2019)*100, digits = 0) # 11%
-moderate <- round(nrow(filter(rf_2019, pol_orient == "Moderate"))/
-                    nrow(rf_2019)*100, digits = 0) # 18%
-slightlylib <- round(nrow(filter(rf_2019, pol_orient == "Slightly Liberal"))/
-                       nrow(rf_2019)*100, digits = 0) # 15%
-lib <- round(nrow(filter(rf_2019, pol_orient == "Liberal"))/
-               nrow(rf_2019)*100, digits = 0) # 22%
-stronglylib <- round(nrow(filter(rf_2019, pol_orient == "Strongly Liberal"))/
-                       nrow(rf_2019)*100, digits = 0) # 18%
-```
+As described in the manuscript, the present research involves secondary data analyses of three existing datasets: one that was collected by one of the authors ([Redacted for peer review]) before the COVID-19 pandemic began in December 2019 and a second that was collected by another of the authors ([Redacted for peer review]) in collaboration with marketing research firm [Redacted for peer review] after the COVID-19 pandemic began in June 2020. Each of these datasets includes the Regulatory Focus Questionnaire [RFQ; @higginsetal2001] and demographic items related to age and political orientation. In addition to the key items of interest described in the manuscript, the studies included a range of additional measures unrelated to the present investigation. Please see below for a description of these measures and the studies' procedures.
 
-```{r rf_2020_ps}
-# Gender
-male <- sum(rf_2020$gender == "Male", na.rm = T) # n = 294
-female <- sum(rf_2020$gender == "Female", na.rm = T) # n = 306
-malepct <- round(male/nrow(rf_2020)*100, digits = 0) # 49%
-femalepct <- round(female/nrow(rf_2020)*100, digits = 0) # 51%
-
-# Age Group
-eighteen24 <- round(nrow(filter(rf_2020, agegroup == "18 - 24"))/
-                      nrow(rf_2020)*100, digits = 0) # 8%
-twentyfive34 <- round(nrow(filter(rf_2020, agegroup == "25 - 34"))/
-                        nrow(rf_2020)*100, digits = 0) # 27%
-thirtyfive44 <- round(nrow(filter(rf_2020, agegroup == "35 - 44"))/
-                        nrow(rf_2020)*100, digits = 0) # 8%
-fortyfive54 <- round(nrow(filter(rf_2020, agegroup == "45 - 54"))/
-                       nrow(rf_2020)*100, digits = 0) # 16%
-fiftyfive64 <- round(nrow(filter(rf_2020, agegroup == "55 - 64"))/
-                       nrow(rf_2020)*100, digits = 0) # 35%
-sixtyfiveplus <- round(nrow(filter(rf_2020, agegroup == "65 or older"))/
-                         nrow(rf_2020)*100, digits = 0) # 6%
-
-# Political Orientation
-stronglycons <- round(nrow(filter(rf_2020, pol_orient == "Strongly Conservative"))/
-                        nrow(rf_2020)*100, digits = 0) # 11%
-cons <- round(nrow(filter(rf_2020, pol_orient == "Conservative"))/
-                nrow(rf_2020)*100, digits = 0) # 16%
-slightlycons <- round(nrow(filter(rf_2020, pol_orient == "Slightly Conservative"))/
-                        nrow(rf_2020)*100, digits = 0) # 10%
-moderate <- round(nrow(filter(rf_2020, pol_orient == "Moderate"))/
-                    nrow(rf_2020)*100, digits = 0) # 36%
-slightlylib <- round(nrow(filter(rf_2020, pol_orient == "Slightly Liberal"))/
-                       nrow(rf_2020)*100, digits = 0) # 8%
-lib <- round(nrow(filter(rf_2020, pol_orient == "Liberal"))/
-               nrow(rf_2020)*100, digits = 0) # 10%
-stronglylib <- round(nrow(filter(rf_2020, pol_orient == "Strongly Liberal"))/
-                       nrow(rf_2020)*100, digits = 0) # 9%
-```
-
-# Study Materials and Procedure Beyond RFQ and Demographic Questionnaires
-
-As described in the manuscript, the present research involves secondary data analyses of two existing datasets: one that was collected by one of the authors ([Redacted]) before the COVID-19 pandemic began in December 2019 and a second that was collected by another of the authors ([Redacted]) in collaboration with Ipsos after the COVID-19 pandemic began in June 2020. Both of these datasets include the Regulatory Focus Questionnaire [RFQ; @higginsetal2001] and demographic items related to age and political orientation. In addition to the key items of interest described in the manuscript, the studies included a range of additional measures unrelated to the present investigation. Please see below for a description of these measures and the study's procedure.
-
-## 2019 Data (Before COVID-19 Pandemic)
+## 2019 Data (Pre-Covid-19 Pandemic)
 
 After consenting to participate in the study, participants first completed the Regulatory Focus Strength measure [@higginsetal1997], an implicit accessibility measure that uses participants' response latency when responding to questions about their ideals (promotion) versus oughts (prevention) to measure their regulatory focus. Participants were then asked to rate the importance of 39 different everyday activities (e.g., *explore*, *advance*, *prevent*). Next, participants completed the Regulatory Focus Questionnaire [@higginsetal2001] to assess their motivational orientations with respect to promotion pride and prevention pride, as well as the Regulatory Mode Questionnaire [@kruglanskietal2000] to assess their motivational orientations with respect to locomotion and assessment. Then, participants completed a series of self-report questionnaires to assess their motivation and personality, including: the Need for Closure Scale [@kruglanskietal1993; @websterkruglanski1994], the Five-Dimensional Curiosity Scale [@kashdanetal2018], the Interest/Deprivation Epistemic Curiosity Scale [@litmanspielberger2003], the System Justification Scale [@kayjost2003], the Aggression-Submission-Conventionalism Scale [@dunwoodyfunke2016], the Capacity for Self-Control Scale [@hoyledavisson2017], and the Big Five Inventory [@johnetal1991]. Finally, participants optionally provided brief demographic information, including their age, gender, native language, ethnicity, current location, student status, education, household income, religious affiliation and background, and political orientation. Before finishing the study, participants were asked to complete an attention check item asking them to briefly describe the "general gist" of one question they answered during the study. Participants were then debriefed and compensated.
 
-## 2020 Data (After COVID-19 Pandemic)
+## 2020 Study 1 Data (Post-Covid-19 Pandemic)
 
-After consenting to participate in the study, participants first completed the RFQ, followed by pseveral novel single-item measures intended to probe participants' regulatory focus. After these regulatory focus measures, participants completed a series of self-report measures indicating their knowledge about the open or closed status of food establishments and salons and barbershop, as well as whether they had visted such establishments for in-person service in the last 14 days or planned to do so in the next 14 days (see the manuscript for a full description of these measures). Next, participants indicated whether they are currently using vitamin supplements to maintain their health and well-being, as described in the manuscript. After this measure, participants completed a wide range of measures probing their consumer behavior and intentions, including: plans to purchase or refurbish a computer for oneself or one's family; credit card and life insurance usage and preferred benefits; usage of financial technology such as contactless payments and mobile banking apps; tendency to shop at specific retailers andd preferred benefits when shopping with these retailers; and whether participants purchase frozen food. Finally, participants provided demographic inforamtion including their ethnicity, education, income, political orientation, and age group.
+After consenting to participate in the study, participants first completed the RFQ, followed by several novel single-item measures intended to probe participants' regulatory focus. After these regulatory focus measures, participants completed a series of self-report measures indicating their knowledge about the open or closed status of food establishments and salons and barbershop, as well as whether they had visted such establishments for in-person service in the last 14 days or planned to do so in the next 14 days (see the manuscript for a full description of these measures). Next, participants indicated whether they are currently using vitamin supplements to maintain their health and well-being, as described in the manuscript. After this measure, participants completed a wide range of measures probing their consumer behavior and intentions, including: plans to purchase or refurbish a computer for oneself or one's family; credit card and life insurance usage and preferred benefits; usage of financial technology such as contactless payments and mobile banking apps; tendency to shop at specific retailers andd preferred benefits when shopping with these retailers; and whether participants purchase frozen food. Finally, participants provided demographic inforamtion including their ethnicity, education, income, political orientation, and age group.
+
+## 2020 Study 2 Data (Post-Covid-19 Pandemic)
+
+After consenting to participate in the study, participants completed a series of self-report measures indicating their past behavior and likelihood of future behavior in the domains of transportation, entertainment, and shopping, followed by items probing the preventative behaviors and Covid-19 threat perceptions (see the manuscript for a full description of these measures). Next, participants completed the RFQ, followed by several single-item measures intended to probe participants' regulatory focus (similar to 2020 Study 1). After these regulatory focus measures, participants completed a series of additional self-report measures, including the Attention to Social Comparison Information Scale [@beardenrose1990] and the generalized Sense of Power Scale [@andersongalinsky2006]. Finally, participants provided demographic inforamtion including their ethnicity, education, income, political orientation, and age group.
 
 # Complete Model Output for All Key Analyses
 
-## Differences in Regulatory Focus Before Versus After COVID-19 Pandemic
+## Study 1 Results
 
-```{r prom_diff}
-prom.year <- lm(prom ~ year.d + agegroup.num + pol_orient.num, data = rf)
+### Differences in Regulatory Focus Before Versus After Start of Covid-19 Pandemic
 
-prom <- broom::tidy(prom.year)
+```{r s1_prom_diff}
+prom.covid <- lm(prom ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")))
+
+prom <- broom::tidy(prom.covid)
 prom <- rename(prom, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
 prom$` ` <- dplyr::case_when(prom$p < .001 ~ "***",
                              prom$p < .01 ~ "**",
@@ -378,9 +616,9 @@ prom$SE <- round(prom$SE, digits = 2)
 prom$t <- round(prom$t, digits = 2)
 prom$p <- round(prom$p, digits = 3)
 prom$Predictor[prom$Predictor == "(Intercept)"] <- "Intercept"
-prom$Predictor[prom$Predictor == "year.d"] <- "Year"
-prom$Predictor[prom$Predictor == "agegroup.num"] <- "Age Group"
-prom$Predictor[prom$Predictor == "pol_orient.num"] <- "Political Orientation"
+prom$Predictor[prom$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
+prom$Predictor[prom$Predictor == "agegroup.num.c"] <- "Age Group"
+prom$Predictor[prom$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 prom$p <- as.character(prom$p)
 prom$p[prom$p == "0"] <- "< .001"
 prom$p <- ifelse(prom$p == "< .001", prom$p, str_sub(prom$p, 2))
@@ -390,10 +628,10 @@ kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multip
   kable_styling(latex_options = c("HOLD_position"))
 ```
 
-```{r prev_diff}
-prev.year <- lm(prev ~ year.d + agegroup.num + pol_orient.num, data = rf)
+```{r s1_prev_diff}
+prev.covid <- lm(prev ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")))
 
-prev <- broom::tidy(prev.year)
+prev <- broom::tidy(prev.covid)
 prev <- rename(prev, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
 prev$` ` <- dplyr::case_when(prev$p < .001 ~ "***",
                              prev$p < .01 ~ "**",
@@ -405,9 +643,9 @@ prev$SE <- round(prev$SE, digits = 2)
 prev$t <- round(prev$t, digits = 2)
 prev$p <- round(prev$p, digits = 3)
 prev$Predictor[prev$Predictor == "(Intercept)"] <- "Intercept"
-prev$Predictor[prev$Predictor == "year.d"] <- "Year"
-prev$Predictor[prev$Predictor == "agegroup.num"] <- "Age Group"
-prev$Predictor[prev$Predictor == "pol_orient.num"] <- "Political Orientation"
+prev$Predictor[prev$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
+prev$Predictor[prev$Predictor == "agegroup.num.c"] <- "Age Group"
+prev$Predictor[prev$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 prev$p <- as.character(prev$p)
 prev$p[prev$p == "0"] <- "< .001"
 prev$p <- ifelse(prev$p == "< .001", prev$p, str_sub(prev$p, 2))
@@ -419,10 +657,10 @@ kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multip
 
 ### Results Without Controlling for Demographic Covariates
 
-```{r prom_diff_nocv}
-prom.year.nocv <- lm(prom ~ year.d, data = rf)
+```{r s1_prom_diff_nocv}
+prom.covid.nocv <- lm(prom ~ covid.d, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")))
 
-prom <- broom::tidy(prom.year.nocv)
+prom <- broom::tidy(prom.covid.nocv)
 prom <- rename(prom, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
 prom$` ` <- dplyr::case_when(prom$p < .001 ~ "***",
                              prom$p < .01 ~ "**",
@@ -434,20 +672,20 @@ prom$SE <- round(prom$SE, digits = 2)
 prom$t <- round(prom$t, digits = 2)
 prom$p <- round(prom$p, digits = 3)
 prom$Predictor[prom$Predictor == "(Intercept)"] <- "Intercept"
-prom$Predictor[prom$Predictor == "year.d"] <- "Year"
+prom$Predictor[prom$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
 prom$p <- as.character(prom$p)
 prom$p[prom$p == "0"] <- "< .001"
 prom$p <- ifelse(prom$p == "< .001", prom$p, str_sub(prom$p, 2))
 prom[is.na(prom)] <- ""
 
-kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Promotion Pride (No Demographic Covariates)", align='lrrrr') %>%
+kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Promotion Pride", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
 ```
 
-```{r prev_diff_nocv}
-prev.year.nocv <- lm(prev ~ year.d, data = rf)
+```{r s1_prev_diff_nocv}
+prev.covid.nocv <- lm(prev ~ covid.d, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "Jun")))
 
-prev <- broom::tidy(prev.year.nocv)
+prev <- broom::tidy(prev.covid.nocv)
 prev <- rename(prev, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
 prev$` ` <- dplyr::case_when(prev$p < .001 ~ "***",
                              prev$p < .01 ~ "**",
@@ -459,22 +697,22 @@ prev$SE <- round(prev$SE, digits = 2)
 prev$t <- round(prev$t, digits = 2)
 prev$p <- round(prev$p, digits = 3)
 prev$Predictor[prev$Predictor == "(Intercept)"] <- "Intercept"
-prev$Predictor[prev$Predictor == "year.d"] <- "Year"
+prev$Predictor[prev$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
 prev$p <- as.character(prev$p)
 prev$p[prev$p == "0"] <- "< .001"
 prev$p <- ifelse(prev$p == "< .001", prev$p, str_sub(prev$p, 2))
 prev[is.na(prev)] <- ""
 
-kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Prevention Pride (No Demographic Covariates)", align='lrrrr') %>%
+kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Prevention Pride", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
 ```
 
-## Associations Between Post-COVID-19 Regulatory Focus Pride and Behavioral Outcomes
+### Associations Between Post-Covid-19 Regulatory Focus Pride and Behavioral Outcomes
 
-### Knowing with Certainty If Establishments Are Open or Closed for In-Person Service
+**Actively Searching for Information About the Opening of the Market**
 
 ```{r foodest_open}
-foodest_open.rf <- glm(foodest_open_certain.d ~ prom + prev + agegroup.num + pol_orient.num, data = rf, family = "binomial")
+foodest_open.rf <- glm(foodest_open_certain.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
 
 foodest_open <- broom::tidy(foodest_open.rf)
 foodest_open <- rename(foodest_open, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
@@ -490,8 +728,8 @@ foodest_open$p <- round(foodest_open$p, digits = 3)
 foodest_open$Predictor[foodest_open$Predictor == "(Intercept)"] <- "Intercept"
 foodest_open$Predictor[foodest_open$Predictor == "prom"] <- "Promotion Pride"
 foodest_open$Predictor[foodest_open$Predictor == "prev"] <- "Prevention Pride"
-foodest_open$Predictor[foodest_open$Predictor == "agegroup.num"] <- "Age Group"
-foodest_open$Predictor[foodest_open$Predictor == "pol_orient.num"] <- "Political Orientation"
+foodest_open$Predictor[foodest_open$Predictor == "agegroup.num.c"] <- "Age Group"
+foodest_open$Predictor[foodest_open$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 foodest_open$p <- as.character(foodest_open$p)
 foodest_open$p[foodest_open$p == "0"] <- "< .001"
 foodest_open$p <- ifelse(foodest_open$p == "< .001", foodest_open$p, str_sub(foodest_open$p, 2))
@@ -502,7 +740,7 @@ kable(foodest_open, "latex", booktabs = TRUE, caption = "Parameter Estimates fro
 ```
 
 ```{r salon_open}
-salon_open.rf <- glm(salon_open_certain.d ~ prom + prev + agegroup.num + pol_orient.num, data = rf, family = "binomial")
+salon_open.rf <- glm(salon_open_certain.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
 
 salon_open <- broom::tidy(salon_open.rf)
 salon_open <- rename(salon_open, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
@@ -518,8 +756,8 @@ salon_open$p <- round(salon_open$p, digits = 3)
 salon_open$Predictor[salon_open$Predictor == "(Intercept)"] <- "Intercept"
 salon_open$Predictor[salon_open$Predictor == "prom"] <- "Promotion Pride"
 salon_open$Predictor[salon_open$Predictor == "prev"] <- "Prevention Pride"
-salon_open$Predictor[salon_open$Predictor == "agegroup.num"] <- "Age Group"
-salon_open$Predictor[salon_open$Predictor == "pol_orient.num"] <- "Political Orientation"
+salon_open$Predictor[salon_open$Predictor == "agegroup.num.c"] <- "Age Group"
+salon_open$Predictor[salon_open$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 salon_open$p <- as.character(salon_open$p)
 salon_open$p[salon_open$p == "0"] <- "< .001"
 salon_open$p <- ifelse(salon_open$p == "< .001", salon_open$p, str_sub(salon_open$p, 2))
@@ -529,10 +767,68 @@ kable(salon_open, "latex", booktabs = TRUE, caption = "Parameter Estimates from 
   kable_styling(latex_options = c("HOLD_position"))
 ```
 
-### Already Visited Establishments for In-Person Service
+**Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days**
+
+```{r foodest_l}
+foodest_l.rf <- glm(foodest_l.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = foodest, family = "binomial")
+
+foodest_l <- broom::tidy(foodest_l.rf)
+foodest_l <- rename(foodest_l, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+foodest_l$` ` <- dplyr::case_when(foodest_l$p < .001 ~ "***",
+                             foodest_l$p < .01 ~ "**",
+                             foodest_l$p < .05 ~ "*",
+                             foodest_l$p < .1 ~ "†",
+                             foodest_l$p < 1 ~ " ")
+foodest_l$Estimate <- round(foodest_l$Estimate, digits = 2)
+foodest_l$SE <- round(foodest_l$SE, digits = 2)
+foodest_l$z <- round(foodest_l$z, digits = 2)
+foodest_l$p <- round(foodest_l$p, digits = 3)
+foodest_l$Predictor[foodest_l$Predictor == "(Intercept)"] <- "Intercept"
+foodest_l$Predictor[foodest_l$Predictor == "prom"] <- "Promotion Pride"
+foodest_l$Predictor[foodest_l$Predictor == "prev"] <- "Prevention Pride"
+foodest_l$Predictor[foodest_l$Predictor == "agegroup.num.c"] <- "Age Group"
+foodest_l$Predictor[foodest_l$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+foodest_l$p <- as.character(foodest_l$p)
+foodest_l$p[foodest_l$p == "0"] <- "< .001"
+foodest_l$p <- ifelse(foodest_l$p == "< .001", foodest_l$p, str_sub(foodest_l$p, 2))
+foodest_l[is.na(foodest_l)] <- ""
+
+kable(foodest_l, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Planning to Dine at a Food Establishment in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r salon_l}
+salon_l.rf <- glm(salon_l.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = salon, family = "binomial")
+
+salon_l <- broom::tidy(salon_l.rf)
+salon_l <- rename(salon_l, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+salon_l$` ` <- dplyr::case_when(salon_l$p < .001 ~ "***",
+                             salon_l$p < .01 ~ "**",
+                             salon_l$p < .05 ~ "*",
+                             salon_l$p < .1 ~ "†",
+                             salon_l$p < 1 ~ " ")
+salon_l$Estimate <- round(salon_l$Estimate, digits = 2)
+salon_l$SE <- round(salon_l$SE, digits = 2)
+salon_l$z <- round(salon_l$z, digits = 2)
+salon_l$p <- round(salon_l$p, digits = 3)
+salon_l$Predictor[salon_l$Predictor == "(Intercept)"] <- "Intercept"
+salon_l$Predictor[salon_l$Predictor == "prom"] <- "Promotion Pride"
+salon_l$Predictor[salon_l$Predictor == "prev"] <- "Prevention Pride"
+salon_l$Predictor[salon_l$Predictor == "agegroup.num.c"] <- "Age Group"
+salon_l$Predictor[salon_l$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+salon_l$p <- as.character(salon_l$p)
+salon_l$p[salon_l$p == "0"] <- "< .001"
+salon_l$p <- ifelse(salon_l$p == "< .001", salon_l$p, str_sub(salon_l$p, 2))
+salon_l[is.na(salon_l)] <- ""
+
+kable(salon_l, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Planning to Visit a Salon or Barbershop for In-Person Service in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+**Behavior Involving Moving Forward with Marketplace Activity in the Past 14 Days**
 
 ```{r foodest_been}
-foodest_been.rf <- glm(foodest_been.d ~ prom + prev + agegroup.num + pol_orient.num, data = foodest, family = "binomial")
+foodest_been.rf <- glm(foodest_been.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = foodest, family = "binomial")
 
 foodest_been <- broom::tidy(foodest_been.rf)
 foodest_been <- rename(foodest_been, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
@@ -548,8 +844,8 @@ foodest_been$p <- round(foodest_been$p, digits = 3)
 foodest_been$Predictor[foodest_been$Predictor == "(Intercept)"] <- "Intercept"
 foodest_been$Predictor[foodest_been$Predictor == "prom"] <- "Promotion Pride"
 foodest_been$Predictor[foodest_been$Predictor == "prev"] <- "Prevention Pride"
-foodest_been$Predictor[foodest_been$Predictor == "agegroup.num"] <- "Age Group"
-foodest_been$Predictor[foodest_been$Predictor == "pol_orient.num"] <- "Political Orientation"
+foodest_been$Predictor[foodest_been$Predictor == "agegroup.num.c"] <- "Age Group"
+foodest_been$Predictor[foodest_been$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 foodest_been$p <- as.character(foodest_been$p)
 foodest_been$p[foodest_been$p == "0"] <- "< .001"
 foodest_been$p <- ifelse(foodest_been$p == "< .001", foodest_been$p, str_sub(foodest_been$p, 2))
@@ -560,7 +856,7 @@ kable(foodest_been, "latex", booktabs = TRUE, caption = "Parameter Estimates fro
 ```
 
 ```{r salon_been}
-salon_been.rf <- glm(salon_been.d ~ prom + prev + agegroup.num + pol_orient.num, data = salon, family = "binomial")
+salon_been.rf <- glm(salon_been.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = salon, family = "binomial")
 
 salon_been <- broom::tidy(salon_been.rf)
 salon_been <- rename(salon_been, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
@@ -576,8 +872,8 @@ salon_been$p <- round(salon_been$p, digits = 3)
 salon_been$Predictor[salon_been$Predictor == "(Intercept)"] <- "Intercept"
 salon_been$Predictor[salon_been$Predictor == "prom"] <- "Promotion Pride"
 salon_been$Predictor[salon_been$Predictor == "prev"] <- "Prevention Pride"
-salon_been$Predictor[salon_been$Predictor == "agegroup.num"] <- "Age Group"
-salon_been$Predictor[salon_been$Predictor == "pol_orient.num"] <- "Political Orientation"
+salon_been$Predictor[salon_been$Predictor == "agegroup.num.c"] <- "Age Group"
+salon_been$Predictor[salon_been$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 salon_been$p <- as.character(salon_been$p)
 salon_been$p[salon_been$p == "0"] <- "< .001"
 salon_been$p <- ifelse(salon_been$p == "< .001", salon_been$p, str_sub(salon_been$p, 2))
@@ -587,68 +883,10 @@ kable(salon_been, "latex", booktabs = TRUE, caption = "Parameter Estimates from 
   kable_styling(latex_options = c("HOLD_position"))
 ```
 
-### Plan to Visit Establishments for In-Person Service
-
-```{r foodest_plan}
-foodest_plan.rf <- glm(foodest_plan.d ~ prom + prev + agegroup.num + pol_orient.num, data = foodest, family = "binomial")
-
-foodest_plan <- broom::tidy(foodest_plan.rf)
-foodest_plan <- rename(foodest_plan, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
-foodest_plan$` ` <- dplyr::case_when(foodest_plan$p < .001 ~ "***",
-                             foodest_plan$p < .01 ~ "**",
-                             foodest_plan$p < .05 ~ "*",
-                             foodest_plan$p < .1 ~ "†",
-                             foodest_plan$p < 1 ~ " ")
-foodest_plan$Estimate <- round(foodest_plan$Estimate, digits = 2)
-foodest_plan$SE <- round(foodest_plan$SE, digits = 2)
-foodest_plan$z <- round(foodest_plan$z, digits = 2)
-foodest_plan$p <- round(foodest_plan$p, digits = 3)
-foodest_plan$Predictor[foodest_plan$Predictor == "(Intercept)"] <- "Intercept"
-foodest_plan$Predictor[foodest_plan$Predictor == "prom"] <- "Promotion Pride"
-foodest_plan$Predictor[foodest_plan$Predictor == "prev"] <- "Prevention Pride"
-foodest_plan$Predictor[foodest_plan$Predictor == "agegroup.num"] <- "Age Group"
-foodest_plan$Predictor[foodest_plan$Predictor == "pol_orient.num"] <- "Political Orientation"
-foodest_plan$p <- as.character(foodest_plan$p)
-foodest_plan$p[foodest_plan$p == "0"] <- "< .001"
-foodest_plan$p <- ifelse(foodest_plan$p == "< .001", foodest_plan$p, str_sub(foodest_plan$p, 2))
-foodest_plan[is.na(foodest_plan)] <- ""
-
-kable(foodest_plan, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Planning to Dine at a Food Establishment in the Next 14 Days", align='lrrrr') %>%
-  kable_styling(latex_options = c("HOLD_position"))
-```
-
-```{r salon_plan}
-salon_plan.rf <- glm(salon_plan.d ~ prom + prev + agegroup.num + pol_orient.num, data = salon, family = "binomial")
-
-salon_plan <- broom::tidy(salon_plan.rf)
-salon_plan <- rename(salon_plan, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
-salon_plan$` ` <- dplyr::case_when(salon_plan$p < .001 ~ "***",
-                             salon_plan$p < .01 ~ "**",
-                             salon_plan$p < .05 ~ "*",
-                             salon_plan$p < .1 ~ "†",
-                             salon_plan$p < 1 ~ " ")
-salon_plan$Estimate <- round(salon_plan$Estimate, digits = 2)
-salon_plan$SE <- round(salon_plan$SE, digits = 2)
-salon_plan$z <- round(salon_plan$z, digits = 2)
-salon_plan$p <- round(salon_plan$p, digits = 3)
-salon_plan$Predictor[salon_plan$Predictor == "(Intercept)"] <- "Intercept"
-salon_plan$Predictor[salon_plan$Predictor == "prom"] <- "Promotion Pride"
-salon_plan$Predictor[salon_plan$Predictor == "prev"] <- "Prevention Pride"
-salon_plan$Predictor[salon_plan$Predictor == "agegroup.num"] <- "Age Group"
-salon_plan$Predictor[salon_plan$Predictor == "pol_orient.num"] <- "Political Orientation"
-salon_plan$p <- as.character(salon_plan$p)
-salon_plan$p[salon_plan$p == "0"] <- "< .001"
-salon_plan$p <- ifelse(salon_plan$p == "< .001", salon_plan$p, str_sub(salon_plan$p, 2))
-salon_plan[is.na(salon_plan)] <- ""
-
-kable(salon_plan, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Planning to Visit a Salon or Barbershop for In-Person Service in the Next 14 Days", align='lrrrr') %>%
-  kable_styling(latex_options = c("HOLD_position"))
-```
-
-### Usage of Vitamin Supplements for Health and Well-Being
+**Usage of Vitamin Supplements for Health and Well-Being**
 
 ```{r vitamins_current}
-vitamins_current.rf <- glm(vitamins_current.d ~ prom + prev + agegroup.num + pol_orient.num, data = rf, family = "binomial")
+vitamins_current.rf <- glm(vitamins_current.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
 
 vitamins_current <- broom::tidy(vitamins_current.rf)
 vitamins_current <- rename(vitamins_current, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
@@ -664,8 +902,8 @@ vitamins_current$p <- round(vitamins_current$p, digits = 3)
 vitamins_current$Predictor[vitamins_current$Predictor == "(Intercept)"] <- "Intercept"
 vitamins_current$Predictor[vitamins_current$Predictor == "prom"] <- "Promotion Pride"
 vitamins_current$Predictor[vitamins_current$Predictor == "prev"] <- "Prevention Pride"
-vitamins_current$Predictor[vitamins_current$Predictor == "agegroup.num"] <- "Age Group"
-vitamins_current$Predictor[vitamins_current$Predictor == "pol_orient.num"] <- "Political Orientation"
+vitamins_current$Predictor[vitamins_current$Predictor == "agegroup.num.c"] <- "Age Group"
+vitamins_current$Predictor[vitamins_current$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 vitamins_current$p <- as.character(vitamins_current$p)
 vitamins_current$p[vitamins_current$p == "0"] <- "< .001"
 vitamins_current$p <- ifelse(vitamins_current$p == "< .001", vitamins_current$p, str_sub(vitamins_current$p, 2))
@@ -675,10 +913,10 @@ kable(vitamins_current, "latex", booktabs = TRUE, caption = "Parameter Estimates
   kable_styling(latex_options = c("HOLD_position"))
 ```
 
-### Purchases Frozen Food
+**Purchases Frozen Food**
 
 ```{r frozenfood}
-frozenfood.rf <- glm(frozenfood.d ~ prom + prev + agegroup.num + pol_orient.num, data = rf, family = "binomial")
+frozenfood.rf <- glm(frozenfood.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
 
 frozenfood <- broom::tidy(frozenfood.rf)
 frozenfood <- rename(frozenfood, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
@@ -694,14 +932,1040 @@ frozenfood$p <- round(frozenfood$p, digits = 3)
 frozenfood$Predictor[frozenfood$Predictor == "(Intercept)"] <- "Intercept"
 frozenfood$Predictor[frozenfood$Predictor == "prom"] <- "Promotion Pride"
 frozenfood$Predictor[frozenfood$Predictor == "prev"] <- "Prevention Pride"
-frozenfood$Predictor[frozenfood$Predictor == "agegroup.num"] <- "Age Group"
-frozenfood$Predictor[frozenfood$Predictor == "pol_orient.num"] <- "Political Orientation"
+frozenfood$Predictor[frozenfood$Predictor == "agegroup.num.c"] <- "Age Group"
+frozenfood$Predictor[frozenfood$Predictor == "pol_orient.num.c"] <- "Political Orientation"
 frozenfood$p <- as.character(frozenfood$p)
 frozenfood$p[frozenfood$p == "0"] <- "< .001"
 frozenfood$p <- ifelse(frozenfood$p == "< .001", frozenfood$p, str_sub(frozenfood$p, 2))
 frozenfood[is.na(frozenfood)] <- ""
 
 kable(frozenfood, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Purchasing Frozen Food", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+## Study 2 Results
+
+### Differences in Regulatory Focus Before Versus After Start of Covid-19 Pandemic
+
+```{r s2_prom_diff}
+prom.covid <- lm(prom ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")))
+
+prom <- broom::tidy(prom.covid)
+prom <- rename(prom, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+prom$` ` <- dplyr::case_when(prom$p < .001 ~ "***",
+                             prom$p < .01 ~ "**",
+                             prom$p < .05 ~ "*",
+                             prom$p < .1 ~ "†",
+                             prom$p < 1 ~ " ")
+prom$Estimate <- round(prom$Estimate, digits = 2)
+prom$SE <- round(prom$SE, digits = 2)
+prom$t <- round(prom$t, digits = 2)
+prom$p <- round(prom$p, digits = 3)
+prom$Predictor[prom$Predictor == "(Intercept)"] <- "Intercept"
+prom$Predictor[prom$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
+prom$Predictor[prom$Predictor == "agegroup.num.c"] <- "Age Group"
+prom$Predictor[prom$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+prom$p <- as.character(prom$p)
+prom$p[prom$p == "0"] <- "< .001"
+prom$p <- ifelse(prom$p == "< .001", prom$p, str_sub(prom$p, 2))
+prom[is.na(prom)] <- ""
+
+kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Promotion Pride", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r s2_prev_diff}
+prev.covid <- lm(prev ~ covid.d + agegroup.num.c + pol_orient.num.c, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")))
+
+prev <- broom::tidy(prev.covid)
+prev <- rename(prev, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+prev$` ` <- dplyr::case_when(prev$p < .001 ~ "***",
+                             prev$p < .01 ~ "**",
+                             prev$p < .05 ~ "*",
+                             prev$p < .1 ~ "†",
+                             prev$p < 1 ~ " ")
+prev$Estimate <- round(prev$Estimate, digits = 2)
+prev$SE <- round(prev$SE, digits = 2)
+prev$t <- round(prev$t, digits = 2)
+prev$p <- round(prev$p, digits = 3)
+prev$Predictor[prev$Predictor == "(Intercept)"] <- "Intercept"
+prev$Predictor[prev$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
+prev$Predictor[prev$Predictor == "agegroup.num.c"] <- "Age Group"
+prev$Predictor[prev$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+prev$p <- as.character(prev$p)
+prev$p[prev$p == "0"] <- "< .001"
+prev$p <- ifelse(prev$p == "< .001", prev$p, str_sub(prev$p, 2))
+prev[is.na(prev)] <- ""
+
+kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Prevention Pride", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+**Results Without Controlling for Demographic Covariates**
+
+```{r s2_prom_diff_nocv}
+prom.covid.nocv <- lm(prom ~ covid.d, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")))
+
+prom <- broom::tidy(prom.covid.nocv)
+prom <- rename(prom, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+prom$` ` <- dplyr::case_when(prom$p < .001 ~ "***",
+                             prom$p < .01 ~ "**",
+                             prom$p < .05 ~ "*",
+                             prom$p < .1 ~ "†",
+                             prom$p < 1 ~ " ")
+prom$Estimate <- round(prom$Estimate, digits = 2)
+prom$SE <- round(prom$SE, digits = 2)
+prom$t <- round(prom$t, digits = 2)
+prom$p <- round(prom$p, digits = 3)
+prom$Predictor[prom$Predictor == "(Intercept)"] <- "Intercept"
+prom$Predictor[prom$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
+prom$p <- as.character(prom$p)
+prom$p[prom$p == "0"] <- "< .001"
+prom$p <- ifelse(prom$p == "< .001", prom$p, str_sub(prom$p, 2))
+prom[is.na(prom)] <- ""
+
+kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Promotion Pride", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r s2_prev_diff_nocv}
+prev.covid.nocv <- lm(prev ~ covid.d, data = filter(rf, covid == "Pre-Covid" | (covid == "Post-Covid" & month == "July")))
+
+prev <- broom::tidy(prev.covid.nocv)
+prev <- rename(prev, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+prev$` ` <- dplyr::case_when(prev$p < .001 ~ "***",
+                             prev$p < .01 ~ "**",
+                             prev$p < .05 ~ "*",
+                             prev$p < .1 ~ "†",
+                             prev$p < 1 ~ " ")
+prev$Estimate <- round(prev$Estimate, digits = 2)
+prev$SE <- round(prev$SE, digits = 2)
+prev$t <- round(prev$t, digits = 2)
+prev$p <- round(prev$p, digits = 3)
+prev$Predictor[prev$Predictor == "(Intercept)"] <- "Intercept"
+prev$Predictor[prev$Predictor == "covid.d"] <- "Pre- vs. Post-Covid"
+prev$p <- as.character(prev$p)
+prev$p[prev$p == "0"] <- "< .001"
+prev$p <- ifelse(prev$p == "< .001", prev$p, str_sub(prev$p, 2))
+prev[is.na(prev)] <- ""
+
+kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Regression Analysis Predicting Prevention Pride", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+**Monthly Analysis**
+
+```{r s1s2_prom_diff_age_pol}
+prom.month <- lm(prom ~ month.num + agegroup.num.c + pol_orient.num.c, data = rf)
+
+prom <- broom::tidy(prom.month)
+prom <- rename(prom, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+prom$` ` <- dplyr::case_when(prom$p < .001 ~ "***",
+                             prom$p < .01 ~ "**",
+                             prom$p < .05 ~ "*",
+                             prom$p < .1 ~ "†",
+                             prom$p < 1 ~ " ")
+prom$Estimate <- round(prom$Estimate, digits = 2)
+prom$SE <- round(prom$SE, digits = 2)
+prom$t <- round(prom$t, digits = 2)
+prom$p <- round(prom$p, digits = 3)
+prom$Predictor[prom$Predictor == "(Intercept)"] <- "Intercept"
+prom$Predictor[prom$Predictor == "month.num"] <- "Month"
+prom$Predictor[prom$Predictor == "agegroup.num.c"] <- "Age Group"
+prom$Predictor[prom$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+prom$p <- as.character(prom$p)
+prom$p[prom$p == "0"] <- "< .001"
+prom$p <- ifelse(prom$p == "< .001", prom$p, str_sub(prom$p, 2))
+prom[is.na(prom)] <- ""
+
+kable(prom, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Promotion Pride", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r s1s2_prev_diff_age_pol}
+prev.month <- lm(prev ~ month.num + agegroup.num.c + pol_orient.num.c, data = rf)
+
+prev <- broom::tidy(prev.month)
+prev <- rename(prev, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+prev$` ` <- dplyr::case_when(prev$p < .001 ~ "***",
+                             prev$p < .01 ~ "**",
+                             prev$p < .05 ~ "*",
+                             prev$p < .1 ~ "†",
+                             prev$p < 1 ~ " ")
+prev$Estimate <- round(prev$Estimate, digits = 2)
+prev$SE <- round(prev$SE, digits = 2)
+prev$t <- round(prev$t, digits = 2)
+prev$p <- round(prev$p, digits = 3)
+prev$Predictor[prev$Predictor == "(Intercept)"] <- "Intercept"
+prev$Predictor[prev$Predictor == "month.num"] <- "Month"
+prev$Predictor[prev$Predictor == "agegroup.num.c"] <- "Age Group"
+prev$Predictor[prev$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+prev$p <- as.character(prev$p)
+prev$p[prev$p == "0"] <- "< .001"
+prev$p <- ifelse(prev$p == "< .001", prev$p, str_sub(prev$p, 2))
+prev[is.na(prev)] <- ""
+
+kable(prev, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Prevention Pride", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+### Associations Between Post-Covid-19 Regulatory Focus Pride and Behavioral Outcomes
+
+**Intentions and Behavior Regarding Marketplace Activity**
+
+*Moving Forward with Marketplace Activity in the Past 14 Days: Entertainment Activities*
+
+```{r out_restaurant}
+out_restaurant.rf <- glm(out_restaurant.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+out_restaurant <- broom::tidy(out_restaurant.rf)
+out_restaurant <- rename(out_restaurant, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+out_restaurant$` ` <- dplyr::case_when(out_restaurant$p < .001 ~ "***",
+                             out_restaurant$p < .01 ~ "**",
+                             out_restaurant$p < .05 ~ "*",
+                             out_restaurant$p < .1 ~ "†",
+                             out_restaurant$p < 1 ~ " ")
+out_restaurant$Estimate <- round(out_restaurant$Estimate, digits = 2)
+out_restaurant$SE <- round(out_restaurant$SE, digits = 2)
+out_restaurant$z <- round(out_restaurant$z, digits = 2)
+out_restaurant$p <- round(out_restaurant$p, digits = 3)
+out_restaurant$Predictor[out_restaurant$Predictor == "(Intercept)"] <- "Intercept"
+out_restaurant$Predictor[out_restaurant$Predictor == "prom"] <- "Promotion Pride"
+out_restaurant$Predictor[out_restaurant$Predictor == "prev"] <- "Prevention Pride"
+out_restaurant$Predictor[out_restaurant$Predictor == "agegroup.num.c"] <- "Age Group"
+out_restaurant$Predictor[out_restaurant$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+out_restaurant$p <- as.character(out_restaurant$p)
+out_restaurant$p[out_restaurant$p == "0"] <- "< .001"
+out_restaurant$p <- ifelse(out_restaurant$p == "< .001", out_restaurant$p, str_sub(out_restaurant$p, 2))
+out_restaurant[is.na(out_restaurant)] <- ""
+
+kable(out_restaurant, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Gone Out to a Restaurant in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r out_publicevent}
+out_publicevent.rf <- glm(out_publicevent.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+out_publicevent <- broom::tidy(out_publicevent.rf)
+out_publicevent <- rename(out_publicevent, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+out_publicevent$` ` <- dplyr::case_when(out_publicevent$p < .001 ~ "***",
+                             out_publicevent$p < .01 ~ "**",
+                             out_publicevent$p < .05 ~ "*",
+                             out_publicevent$p < .1 ~ "†",
+                             out_publicevent$p < 1 ~ " ")
+out_publicevent$Estimate <- round(out_publicevent$Estimate, digits = 2)
+out_publicevent$SE <- round(out_publicevent$SE, digits = 2)
+out_publicevent$z <- round(out_publicevent$z, digits = 2)
+out_publicevent$p <- round(out_publicevent$p, digits = 3)
+out_publicevent$Predictor[out_publicevent$Predictor == "(Intercept)"] <- "Intercept"
+out_publicevent$Predictor[out_publicevent$Predictor == "prom"] <- "Promotion Pride"
+out_publicevent$Predictor[out_publicevent$Predictor == "prev"] <- "Prevention Pride"
+out_publicevent$Predictor[out_publicevent$Predictor == "agegroup.num.c"] <- "Age Group"
+out_publicevent$Predictor[out_publicevent$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+out_publicevent$p <- as.character(out_publicevent$p)
+out_publicevent$p[out_publicevent$p == "0"] <- "< .001"
+out_publicevent$p <- ifelse(out_publicevent$p == "< .001", out_publicevent$p, str_sub(out_publicevent$p, 2))
+out_publicevent[is.na(out_publicevent)] <- ""
+
+kable(out_publicevent, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Gone Out to a Public Event in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r out_bar}
+out_bar.rf <- glm(out_bar.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+out_bar <- broom::tidy(out_bar.rf)
+out_bar <- rename(out_bar, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+out_bar$` ` <- dplyr::case_when(out_bar$p < .001 ~ "***",
+                             out_bar$p < .01 ~ "**",
+                             out_bar$p < .05 ~ "*",
+                             out_bar$p < .1 ~ "†",
+                             out_bar$p < 1 ~ " ")
+out_bar$Estimate <- round(out_bar$Estimate, digits = 2)
+out_bar$SE <- round(out_bar$SE, digits = 2)
+out_bar$z <- round(out_bar$z, digits = 2)
+out_bar$p <- round(out_bar$p, digits = 3)
+out_bar$Predictor[out_bar$Predictor == "(Intercept)"] <- "Intercept"
+out_bar$Predictor[out_bar$Predictor == "prom"] <- "Promotion Pride"
+out_bar$Predictor[out_bar$Predictor == "prev"] <- "Prevention Pride"
+out_bar$Predictor[out_bar$Predictor == "agegroup.num.c"] <- "Age Group"
+out_bar$Predictor[out_bar$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+out_bar$p <- as.character(out_bar$p)
+out_bar$p[out_bar$p == "0"] <- "< .001"
+out_bar$p <- ifelse(out_bar$p == "< .001", out_bar$p, str_sub(out_bar$p, 2))
+out_bar[is.na(out_bar)] <- ""
+
+kable(out_bar, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Gone Out to a Restaurant in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+*Moving Forward with Marketplace Activity in the Past 14 Days: Shopping Activities*
+
+```{r shop_mall}
+shop_mall.rf <- glm(shop_mall.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+shop_mall <- broom::tidy(shop_mall.rf)
+shop_mall <- rename(shop_mall, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+shop_mall$` ` <- dplyr::case_when(shop_mall$p < .001 ~ "***",
+                             shop_mall$p < .01 ~ "**",
+                             shop_mall$p < .05 ~ "*",
+                             shop_mall$p < .1 ~ "†",
+                             shop_mall$p < 1 ~ " ")
+shop_mall$Estimate <- round(shop_mall$Estimate, digits = 2)
+shop_mall$SE <- round(shop_mall$SE, digits = 2)
+shop_mall$z <- round(shop_mall$z, digits = 2)
+shop_mall$p <- round(shop_mall$p, digits = 3)
+shop_mall$Predictor[shop_mall$Predictor == "(Intercept)"] <- "Intercept"
+shop_mall$Predictor[shop_mall$Predictor == "prom"] <- "Promotion Pride"
+shop_mall$Predictor[shop_mall$Predictor == "prev"] <- "Prevention Pride"
+shop_mall$Predictor[shop_mall$Predictor == "agegroup.num.c"] <- "Age Group"
+shop_mall$Predictor[shop_mall$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+shop_mall$p <- as.character(shop_mall$p)
+shop_mall$p[shop_mall$p == "0"] <- "< .001"
+shop_mall$p <- ifelse(shop_mall$p == "< .001", shop_mall$p, str_sub(shop_mall$p, 2))
+shop_mall[is.na(shop_mall)] <- ""
+
+kable(shop_mall, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Gone to a Shopping Mall in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r shop_grocery}
+shop_grocery.rf <- glm(shop_grocery.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+shop_grocery <- broom::tidy(shop_grocery.rf)
+shop_grocery <- rename(shop_grocery, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+shop_grocery$` ` <- dplyr::case_when(shop_grocery$p < .001 ~ "***",
+                             shop_grocery$p < .01 ~ "**",
+                             shop_grocery$p < .05 ~ "*",
+                             shop_grocery$p < .1 ~ "†",
+                             shop_grocery$p < 1 ~ " ")
+shop_grocery$Estimate <- round(shop_grocery$Estimate, digits = 2)
+shop_grocery$SE <- round(shop_grocery$SE, digits = 2)
+shop_grocery$z <- round(shop_grocery$z, digits = 2)
+shop_grocery$p <- round(shop_grocery$p, digits = 3)
+shop_grocery$Predictor[shop_grocery$Predictor == "(Intercept)"] <- "Intercept"
+shop_grocery$Predictor[shop_grocery$Predictor == "prom"] <- "Promotion Pride"
+shop_grocery$Predictor[shop_grocery$Predictor == "prev"] <- "Prevention Pride"
+shop_grocery$Predictor[shop_grocery$Predictor == "agegroup.num.c"] <- "Age Group"
+shop_grocery$Predictor[shop_grocery$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+shop_grocery$p <- as.character(shop_grocery$p)
+shop_grocery$p[shop_grocery$p == "0"] <- "< .001"
+shop_grocery$p <- ifelse(shop_grocery$p == "< .001", shop_grocery$p, str_sub(shop_grocery$p, 2))
+shop_grocery[is.na(shop_grocery)] <- ""
+
+kable(shop_grocery, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Gone to the Grocery Store in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r order_grocery_delivery}
+order_grocery_delivery.rf <- glm(order_grocery_delivery.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+order_grocery_delivery <- broom::tidy(order_grocery_delivery.rf)
+order_grocery_delivery <- rename(order_grocery_delivery, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+order_grocery_delivery$` ` <- dplyr::case_when(order_grocery_delivery$p < .001 ~ "***",
+                             order_grocery_delivery$p < .01 ~ "**",
+                             order_grocery_delivery$p < .05 ~ "*",
+                             order_grocery_delivery$p < .1 ~ "†",
+                             order_grocery_delivery$p < 1 ~ " ")
+order_grocery_delivery$Estimate <- round(order_grocery_delivery$Estimate, digits = 2)
+order_grocery_delivery$SE <- round(order_grocery_delivery$SE, digits = 2)
+order_grocery_delivery$z <- round(order_grocery_delivery$z, digits = 2)
+order_grocery_delivery$p <- round(order_grocery_delivery$p, digits = 3)
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "(Intercept)"] <- "Intercept"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "prom"] <- "Promotion Pride"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "prev"] <- "Prevention Pride"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "agegroup.num.c"] <- "Age Group"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+order_grocery_delivery$p <- as.character(order_grocery_delivery$p)
+order_grocery_delivery$p[order_grocery_delivery$p == "0"] <- "< .001"
+order_grocery_delivery$p <- ifelse(order_grocery_delivery$p == "< .001", order_grocery_delivery$p, str_sub(order_grocery_delivery$p, 2))
+order_grocery_delivery[is.na(order_grocery_delivery)] <- ""
+
+kable(order_grocery_delivery, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Ordered Groceries for Delivery in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r order_grocery_pickup}
+order_grocery_pickup.rf <- glm(order_grocery_pickup.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+order_grocery_pickup <- broom::tidy(order_grocery_pickup.rf)
+order_grocery_pickup <- rename(order_grocery_pickup, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+order_grocery_pickup$` ` <- dplyr::case_when(order_grocery_pickup$p < .001 ~ "***",
+                             order_grocery_pickup$p < .01 ~ "**",
+                             order_grocery_pickup$p < .05 ~ "*",
+                             order_grocery_pickup$p < .1 ~ "†",
+                             order_grocery_pickup$p < 1 ~ " ")
+order_grocery_pickup$Estimate <- round(order_grocery_pickup$Estimate, digits = 2)
+order_grocery_pickup$SE <- round(order_grocery_pickup$SE, digits = 2)
+order_grocery_pickup$z <- round(order_grocery_pickup$z, digits = 2)
+order_grocery_pickup$p <- round(order_grocery_pickup$p, digits = 3)
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "(Intercept)"] <- "Intercept"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "prom"] <- "Promotion Pride"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "prev"] <- "Prevention Pride"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "agegroup.num.c"] <- "Age Group"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+order_grocery_pickup$p <- as.character(order_grocery_pickup$p)
+order_grocery_pickup$p[order_grocery_pickup$p == "0"] <- "< .001"
+order_grocery_pickup$p <- ifelse(order_grocery_pickup$p == "< .001", order_grocery_pickup$p, str_sub(order_grocery_pickup$p, 2))
+order_grocery_pickup[is.na(order_grocery_pickup)] <- ""
+
+kable(order_grocery_pickup, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Ordered Groceries for Pickup in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+*Moving Forward with Marketplace Activity in the Past 14 Days: Transportation Activities*
+
+```{r travel_car}
+travel_car.rf <- glm(travel_car.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+travel_car <- broom::tidy(travel_car.rf)
+travel_car <- rename(travel_car, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+travel_car$` ` <- dplyr::case_when(travel_car$p < .001 ~ "***",
+                             travel_car$p < .01 ~ "**",
+                             travel_car$p < .05 ~ "*",
+                             travel_car$p < .1 ~ "†",
+                             travel_car$p < 1 ~ " ")
+travel_car$Estimate <- round(travel_car$Estimate, digits = 2)
+travel_car$SE <- round(travel_car$SE, digits = 2)
+travel_car$z <- round(travel_car$z, digits = 2)
+travel_car$p <- round(travel_car$p, digits = 3)
+travel_car$Predictor[travel_car$Predictor == "(Intercept)"] <- "Intercept"
+travel_car$Predictor[travel_car$Predictor == "prom"] <- "Promotion Pride"
+travel_car$Predictor[travel_car$Predictor == "prev"] <- "Prevention Pride"
+travel_car$Predictor[travel_car$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_car$Predictor[travel_car$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_car$p <- as.character(travel_car$p)
+travel_car$p[travel_car$p == "0"] <- "< .001"
+travel_car$p <- ifelse(travel_car$p == "< .001", travel_car$p, str_sub(travel_car$p, 2))
+travel_car[is.na(travel_car)] <- ""
+
+kable(travel_car, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Gone on a Road Trip in a Car in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r travel_air}
+travel_air.rf <- glm(travel_air.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+travel_air <- broom::tidy(travel_air.rf)
+travel_air <- rename(travel_air, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+travel_air$` ` <- dplyr::case_when(travel_air$p < .001 ~ "***",
+                             travel_air$p < .01 ~ "**",
+                             travel_air$p < .05 ~ "*",
+                             travel_air$p < .1 ~ "†",
+                             travel_air$p < 1 ~ " ")
+travel_air$Estimate <- round(travel_air$Estimate, digits = 2)
+travel_air$SE <- round(travel_air$SE, digits = 2)
+travel_air$z <- round(travel_air$z, digits = 2)
+travel_air$p <- round(travel_air$p, digits = 3)
+travel_air$Predictor[travel_air$Predictor == "(Intercept)"] <- "Intercept"
+travel_air$Predictor[travel_air$Predictor == "prom"] <- "Promotion Pride"
+travel_air$Predictor[travel_air$Predictor == "prev"] <- "Prevention Pride"
+travel_air$Predictor[travel_air$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_air$Predictor[travel_air$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_air$p <- as.character(travel_air$p)
+travel_air$p[travel_air$p == "0"] <- "< .001"
+travel_air$p <- ifelse(travel_air$p == "< .001", travel_air$p, str_sub(travel_air$p, 2))
+travel_air[is.na(travel_air)] <- ""
+
+kable(travel_air, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Traveled by Airplane in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r travel_rideshare}
+travel_rideshare.rf <- glm(travel_rideshare.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+travel_rideshare <- broom::tidy(travel_rideshare.rf)
+travel_rideshare <- rename(travel_rideshare, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+travel_rideshare$` ` <- dplyr::case_when(travel_rideshare$p < .001 ~ "***",
+                             travel_rideshare$p < .01 ~ "**",
+                             travel_rideshare$p < .05 ~ "*",
+                             travel_rideshare$p < .1 ~ "†",
+                             travel_rideshare$p < 1 ~ " ")
+travel_rideshare$Estimate <- round(travel_rideshare$Estimate, digits = 2)
+travel_rideshare$SE <- round(travel_rideshare$SE, digits = 2)
+travel_rideshare$z <- round(travel_rideshare$z, digits = 2)
+travel_rideshare$p <- round(travel_rideshare$p, digits = 3)
+travel_rideshare$Predictor[travel_rideshare$Predictor == "(Intercept)"] <- "Intercept"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "prom"] <- "Promotion Pride"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "prev"] <- "Prevention Pride"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_rideshare$p <- as.character(travel_rideshare$p)
+travel_rideshare$p[travel_rideshare$p == "0"] <- "< .001"
+travel_rideshare$p <- ifelse(travel_rideshare$p == "< .001", travel_rideshare$p, str_sub(travel_rideshare$p, 2))
+travel_rideshare[is.na(travel_rideshare)] <- ""
+
+kable(travel_rideshare, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Taken a Rideshare in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r travel_taxi}
+travel_taxi.rf <- glm(travel_taxi.d ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf, family = "binomial")
+
+travel_taxi <- broom::tidy(travel_taxi.rf)
+travel_taxi <- rename(travel_taxi, Predictor = term, Estimate = estimate, SE = std.error, z = statistic, p = p.value)
+travel_taxi$` ` <- dplyr::case_when(travel_taxi$p < .001 ~ "***",
+                             travel_taxi$p < .01 ~ "**",
+                             travel_taxi$p < .05 ~ "*",
+                             travel_taxi$p < .1 ~ "†",
+                             travel_taxi$p < 1 ~ " ")
+travel_taxi$Estimate <- round(travel_taxi$Estimate, digits = 2)
+travel_taxi$SE <- round(travel_taxi$SE, digits = 2)
+travel_taxi$z <- round(travel_taxi$z, digits = 2)
+travel_taxi$p <- round(travel_taxi$p, digits = 3)
+travel_taxi$Predictor[travel_taxi$Predictor == "(Intercept)"] <- "Intercept"
+travel_taxi$Predictor[travel_taxi$Predictor == "prom"] <- "Promotion Pride"
+travel_taxi$Predictor[travel_taxi$Predictor == "prev"] <- "Prevention Pride"
+travel_taxi$Predictor[travel_taxi$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_taxi$Predictor[travel_taxi$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_taxi$p <- as.character(travel_taxi$p)
+travel_taxi$p[travel_taxi$p == "0"] <- "< .001"
+travel_taxi$p <- ifelse(travel_taxi$p == "< .001", travel_taxi$p, str_sub(travel_taxi$p, 2))
+travel_taxi[is.na(travel_taxi)] <- ""
+
+kable(travel_taxi, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Logistic Regression Analysis Predicting Having Taken a Taxi in the Past 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+*Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days: Entertainment Activities*
+
+```{r out_restaurant_l}
+out_restaurant.rf <- lm(out_restaurant_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+out_restaurant <- broom::tidy(out_restaurant.rf)
+out_restaurant <- rename(out_restaurant, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+out_restaurant$` ` <- dplyr::case_when(out_restaurant$p < .001 ~ "***",
+                             out_restaurant$p < .01 ~ "**",
+                             out_restaurant$p < .05 ~ "*",
+                             out_restaurant$p < .1 ~ "†",
+                             out_restaurant$p < 1 ~ " ")
+out_restaurant$Estimate <- round(out_restaurant$Estimate, digits = 2)
+out_restaurant$SE <- round(out_restaurant$SE, digits = 2)
+out_restaurant$t <- round(out_restaurant$t, digits = 2)
+out_restaurant$p <- round(out_restaurant$p, digits = 3)
+out_restaurant$Predictor[out_restaurant$Predictor == "(Intercept)"] <- "Intercept"
+out_restaurant$Predictor[out_restaurant$Predictor == "prom"] <- "Promotion Pride"
+out_restaurant$Predictor[out_restaurant$Predictor == "prev"] <- "Prevention Pride"
+out_restaurant$Predictor[out_restaurant$Predictor == "agegroup.num.c"] <- "Age Group"
+out_restaurant$Predictor[out_restaurant$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+out_restaurant$p <- as.character(out_restaurant$p)
+out_restaurant$p[out_restaurant$p == "0"] <- "< .001"
+out_restaurant$p <- ifelse(out_restaurant$p == "< .001", out_restaurant$p, str_sub(out_restaurant$p, 2))
+out_restaurant[is.na(out_restaurant)] <- ""
+
+kable(out_restaurant, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Going Out to a Restaurant in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r out_publicevent_l}
+out_publicevent.rf <- lm(out_publicevent_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+out_publicevent <- broom::tidy(out_publicevent.rf)
+out_publicevent <- rename(out_publicevent, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+out_publicevent$` ` <- dplyr::case_when(out_publicevent$p < .001 ~ "***",
+                             out_publicevent$p < .01 ~ "**",
+                             out_publicevent$p < .05 ~ "*",
+                             out_publicevent$p < .1 ~ "†",
+                             out_publicevent$p < 1 ~ " ")
+out_publicevent$Estimate <- round(out_publicevent$Estimate, digits = 2)
+out_publicevent$SE <- round(out_publicevent$SE, digits = 2)
+out_publicevent$t <- round(out_publicevent$t, digits = 2)
+out_publicevent$p <- round(out_publicevent$p, digits = 3)
+out_publicevent$Predictor[out_publicevent$Predictor == "(Intercept)"] <- "Intercept"
+out_publicevent$Predictor[out_publicevent$Predictor == "prom"] <- "Promotion Pride"
+out_publicevent$Predictor[out_publicevent$Predictor == "prev"] <- "Prevention Pride"
+out_publicevent$Predictor[out_publicevent$Predictor == "agegroup.num.c"] <- "Age Group"
+out_publicevent$Predictor[out_publicevent$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+out_publicevent$p <- as.character(out_publicevent$p)
+out_publicevent$p[out_publicevent$p == "0"] <- "< .001"
+out_publicevent$p <- ifelse(out_publicevent$p == "< .001", out_publicevent$p, str_sub(out_publicevent$p, 2))
+out_publicevent[is.na(out_publicevent)] <- ""
+
+kable(out_publicevent, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Going Out to a Public Event in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r out_bar_l}
+out_bar.rf <- lm(out_bar_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+out_bar <- broom::tidy(out_bar.rf)
+out_bar <- rename(out_bar, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+out_bar$` ` <- dplyr::case_when(out_bar$p < .001 ~ "***",
+                             out_bar$p < .01 ~ "**",
+                             out_bar$p < .05 ~ "*",
+                             out_bar$p < .1 ~ "†",
+                             out_bar$p < 1 ~ " ")
+out_bar$Estimate <- round(out_bar$Estimate, digits = 2)
+out_bar$SE <- round(out_bar$SE, digits = 2)
+out_bar$t <- round(out_bar$t, digits = 2)
+out_bar$p <- round(out_bar$p, digits = 3)
+out_bar$Predictor[out_bar$Predictor == "(Intercept)"] <- "Intercept"
+out_bar$Predictor[out_bar$Predictor == "prom"] <- "Promotion Pride"
+out_bar$Predictor[out_bar$Predictor == "prev"] <- "Prevention Pride"
+out_bar$Predictor[out_bar$Predictor == "agegroup.num.c"] <- "Age Group"
+out_bar$Predictor[out_bar$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+out_bar$p <- as.character(out_bar$p)
+out_bar$p[out_bar$p == "0"] <- "< .001"
+out_bar$p <- ifelse(out_bar$p == "< .001", out_bar$p, str_sub(out_bar$p, 2))
+out_bar[is.na(out_bar)] <- ""
+
+kable(out_bar, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Going Out to a Bar in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+*Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days: Shopping Activities*
+
+```{r shop_mall_l}
+shop_mall.rf <- lm(shop_mall_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+shop_mall <- broom::tidy(shop_mall.rf)
+shop_mall <- rename(shop_mall, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+shop_mall$` ` <- dplyr::case_when(shop_mall$p < .001 ~ "***",
+                             shop_mall$p < .01 ~ "**",
+                             shop_mall$p < .05 ~ "*",
+                             shop_mall$p < .1 ~ "†",
+                             shop_mall$p < 1 ~ " ")
+shop_mall$Estimate <- round(shop_mall$Estimate, digits = 2)
+shop_mall$SE <- round(shop_mall$SE, digits = 2)
+shop_mall$t <- round(shop_mall$t, digits = 2)
+shop_mall$p <- round(shop_mall$p, digits = 3)
+shop_mall$Predictor[shop_mall$Predictor == "(Intercept)"] <- "Intercept"
+shop_mall$Predictor[shop_mall$Predictor == "prom"] <- "Promotion Pride"
+shop_mall$Predictor[shop_mall$Predictor == "prev"] <- "Prevention Pride"
+shop_mall$Predictor[shop_mall$Predictor == "agegroup.num.c"] <- "Age Group"
+shop_mall$Predictor[shop_mall$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+shop_mall$p <- as.character(shop_mall$p)
+shop_mall$p[shop_mall$p == "0"] <- "< .001"
+shop_mall$p <- ifelse(shop_mall$p == "< .001", shop_mall$p, str_sub(shop_mall$p, 2))
+shop_mall[is.na(shop_mall)] <- ""
+
+kable(shop_mall, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Going to a Shopping Mall in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r shop_grocery_l}
+shop_grocery.rf <- lm(shop_grocery_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+shop_grocery <- broom::tidy(shop_grocery.rf)
+shop_grocery <- rename(shop_grocery, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+shop_grocery$` ` <- dplyr::case_when(shop_grocery$p < .001 ~ "***",
+                             shop_grocery$p < .01 ~ "**",
+                             shop_grocery$p < .05 ~ "*",
+                             shop_grocery$p < .1 ~ "†",
+                             shop_grocery$p < 1 ~ " ")
+shop_grocery$Estimate <- round(shop_grocery$Estimate, digits = 2)
+shop_grocery$SE <- round(shop_grocery$SE, digits = 2)
+shop_grocery$t <- round(shop_grocery$t, digits = 2)
+shop_grocery$p <- round(shop_grocery$p, digits = 3)
+shop_grocery$Predictor[shop_grocery$Predictor == "(Intercept)"] <- "Intercept"
+shop_grocery$Predictor[shop_grocery$Predictor == "prom"] <- "Promotion Pride"
+shop_grocery$Predictor[shop_grocery$Predictor == "prev"] <- "Prevention Pride"
+shop_grocery$Predictor[shop_grocery$Predictor == "agegroup.num.c"] <- "Age Group"
+shop_grocery$Predictor[shop_grocery$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+shop_grocery$p <- as.character(shop_grocery$p)
+shop_grocery$p[shop_grocery$p == "0"] <- "< .001"
+shop_grocery$p <- ifelse(shop_grocery$p == "< .001", shop_grocery$p, str_sub(shop_grocery$p, 2))
+shop_grocery[is.na(shop_grocery)] <- ""
+
+kable(shop_grocery, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Going to the Grocery Store in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r order_grocery_delivery_l}
+order_grocery_delivery.rf <- lm(order_grocery_delivery_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+order_grocery_delivery <- broom::tidy(order_grocery_delivery.rf)
+order_grocery_delivery <- rename(order_grocery_delivery, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+order_grocery_delivery$` ` <- dplyr::case_when(order_grocery_delivery$p < .001 ~ "***",
+                             order_grocery_delivery$p < .01 ~ "**",
+                             order_grocery_delivery$p < .05 ~ "*",
+                             order_grocery_delivery$p < .1 ~ "†",
+                             order_grocery_delivery$p < 1 ~ " ")
+order_grocery_delivery$Estimate <- round(order_grocery_delivery$Estimate, digits = 2)
+order_grocery_delivery$SE <- round(order_grocery_delivery$SE, digits = 2)
+order_grocery_delivery$t <- round(order_grocery_delivery$t, digits = 2)
+order_grocery_delivery$p <- round(order_grocery_delivery$p, digits = 3)
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "(Intercept)"] <- "Intercept"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "prom"] <- "Promotion Pride"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "prev"] <- "Prevention Pride"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "agegroup.num.c"] <- "Age Group"
+order_grocery_delivery$Predictor[order_grocery_delivery$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+order_grocery_delivery$p <- as.character(order_grocery_delivery$p)
+order_grocery_delivery$p[order_grocery_delivery$p == "0"] <- "< .001"
+order_grocery_delivery$p <- ifelse(order_grocery_delivery$p == "< .001", order_grocery_delivery$p, str_sub(order_grocery_delivery$p, 2))
+order_grocery_delivery[is.na(order_grocery_delivery)] <- ""
+
+kable(order_grocery_delivery, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Ordering Groceries for Delivery in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r order_grocery_pickup_l}
+order_grocery_pickup.rf <- lm(order_grocery_pickup_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+order_grocery_pickup <- broom::tidy(order_grocery_pickup.rf)
+order_grocery_pickup <- rename(order_grocery_pickup, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+order_grocery_pickup$` ` <- dplyr::case_when(order_grocery_pickup$p < .001 ~ "***",
+                             order_grocery_pickup$p < .01 ~ "**",
+                             order_grocery_pickup$p < .05 ~ "*",
+                             order_grocery_pickup$p < .1 ~ "†",
+                             order_grocery_pickup$p < 1 ~ " ")
+order_grocery_pickup$Estimate <- round(order_grocery_pickup$Estimate, digits = 2)
+order_grocery_pickup$SE <- round(order_grocery_pickup$SE, digits = 2)
+order_grocery_pickup$t <- round(order_grocery_pickup$t, digits = 2)
+order_grocery_pickup$p <- round(order_grocery_pickup$p, digits = 3)
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "(Intercept)"] <- "Intercept"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "prom"] <- "Promotion Pride"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "prev"] <- "Prevention Pride"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "agegroup.num.c"] <- "Age Group"
+order_grocery_pickup$Predictor[order_grocery_pickup$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+order_grocery_pickup$p <- as.character(order_grocery_pickup$p)
+order_grocery_pickup$p[order_grocery_pickup$p == "0"] <- "< .001"
+order_grocery_pickup$p <- ifelse(order_grocery_pickup$p == "< .001", order_grocery_pickup$p, str_sub(order_grocery_pickup$p, 2))
+order_grocery_pickup[is.na(order_grocery_pickup)] <- ""
+
+kable(order_grocery_pickup, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Ordering Groceries for Pickup in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+*Likelihood of Moving Forward with Marketplace Activity in the Next 14 Days: Transportation Activities*
+
+```{r travel_car_l}
+travel_car.rf <- lm(travel_car_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+travel_car <- broom::tidy(travel_car.rf)
+travel_car <- rename(travel_car, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+travel_car$` ` <- dplyr::case_when(travel_car$p < .001 ~ "***",
+                             travel_car$p < .01 ~ "**",
+                             travel_car$p < .05 ~ "*",
+                             travel_car$p < .1 ~ "†",
+                             travel_car$p < 1 ~ " ")
+travel_car$Estimate <- round(travel_car$Estimate, digits = 2)
+travel_car$SE <- round(travel_car$SE, digits = 2)
+travel_car$t <- round(travel_car$t, digits = 2)
+travel_car$p <- round(travel_car$p, digits = 3)
+travel_car$Predictor[travel_car$Predictor == "(Intercept)"] <- "Intercept"
+travel_car$Predictor[travel_car$Predictor == "prom"] <- "Promotion Pride"
+travel_car$Predictor[travel_car$Predictor == "prev"] <- "Prevention Pride"
+travel_car$Predictor[travel_car$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_car$Predictor[travel_car$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_car$p <- as.character(travel_car$p)
+travel_car$p[travel_car$p == "0"] <- "< .001"
+travel_car$p <- ifelse(travel_car$p == "< .001", travel_car$p, str_sub(travel_car$p, 2))
+travel_car[is.na(travel_car)] <- ""
+
+kable(travel_car, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Going on a Road Trip in a Car in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r travel_air_l}
+travel_air.rf <- lm(travel_air_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+travel_air <- broom::tidy(travel_air.rf)
+travel_air <- rename(travel_air, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+travel_air$` ` <- dplyr::case_when(travel_air$p < .001 ~ "***",
+                             travel_air$p < .01 ~ "**",
+                             travel_air$p < .05 ~ "*",
+                             travel_air$p < .1 ~ "†",
+                             travel_air$p < 1 ~ " ")
+travel_air$Estimate <- round(travel_air$Estimate, digits = 2)
+travel_air$SE <- round(travel_air$SE, digits = 2)
+travel_air$t <- round(travel_air$t, digits = 2)
+travel_air$p <- round(travel_air$p, digits = 3)
+travel_air$Predictor[travel_air$Predictor == "(Intercept)"] <- "Intercept"
+travel_air$Predictor[travel_air$Predictor == "prom"] <- "Promotion Pride"
+travel_air$Predictor[travel_air$Predictor == "prev"] <- "Prevention Pride"
+travel_air$Predictor[travel_air$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_air$Predictor[travel_air$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_air$p <- as.character(travel_air$p)
+travel_air$p[travel_air$p == "0"] <- "< .001"
+travel_air$p <- ifelse(travel_air$p == "< .001", travel_air$p, str_sub(travel_air$p, 2))
+travel_air[is.na(travel_air)] <- ""
+
+kable(travel_air, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Traveling by Airplane in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r travel_rideshare_l}
+travel_rideshare.rf <- lm(travel_rideshare_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+travel_rideshare <- broom::tidy(travel_rideshare.rf)
+travel_rideshare <- rename(travel_rideshare, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+travel_rideshare$` ` <- dplyr::case_when(travel_rideshare$p < .001 ~ "***",
+                             travel_rideshare$p < .01 ~ "**",
+                             travel_rideshare$p < .05 ~ "*",
+                             travel_rideshare$p < .1 ~ "†",
+                             travel_rideshare$p < 1 ~ " ")
+travel_rideshare$Estimate <- round(travel_rideshare$Estimate, digits = 2)
+travel_rideshare$SE <- round(travel_rideshare$SE, digits = 2)
+travel_rideshare$t <- round(travel_rideshare$t, digits = 2)
+travel_rideshare$p <- round(travel_rideshare$p, digits = 3)
+travel_rideshare$Predictor[travel_rideshare$Predictor == "(Intercept)"] <- "Intercept"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "prom"] <- "Promotion Pride"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "prev"] <- "Prevention Pride"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_rideshare$Predictor[travel_rideshare$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_rideshare$p <- as.character(travel_rideshare$p)
+travel_rideshare$p[travel_rideshare$p == "0"] <- "< .001"
+travel_rideshare$p <- ifelse(travel_rideshare$p == "< .001", travel_rideshare$p, str_sub(travel_rideshare$p, 2))
+travel_rideshare[is.na(travel_rideshare)] <- ""
+
+kable(travel_rideshare, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Taking a Rideshare in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r travel_taxi_l}
+travel_taxi.rf <- lm(travel_taxi_l ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+travel_taxi <- broom::tidy(travel_taxi.rf)
+travel_taxi <- rename(travel_taxi, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+travel_taxi$` ` <- dplyr::case_when(travel_taxi$p < .001 ~ "***",
+                             travel_taxi$p < .01 ~ "**",
+                             travel_taxi$p < .05 ~ "*",
+                             travel_taxi$p < .1 ~ "†",
+                             travel_taxi$p < 1 ~ " ")
+travel_taxi$Estimate <- round(travel_taxi$Estimate, digits = 2)
+travel_taxi$SE <- round(travel_taxi$SE, digits = 2)
+travel_taxi$t <- round(travel_taxi$t, digits = 2)
+travel_taxi$p <- round(travel_taxi$p, digits = 3)
+travel_taxi$Predictor[travel_taxi$Predictor == "(Intercept)"] <- "Intercept"
+travel_taxi$Predictor[travel_taxi$Predictor == "prom"] <- "Promotion Pride"
+travel_taxi$Predictor[travel_taxi$Predictor == "prev"] <- "Prevention Pride"
+travel_taxi$Predictor[travel_taxi$Predictor == "agegroup.num.c"] <- "Age Group"
+travel_taxi$Predictor[travel_taxi$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+travel_taxi$p <- as.character(travel_taxi$p)
+travel_taxi$p[travel_taxi$p == "0"] <- "< .001"
+travel_taxi$p <- ifelse(travel_taxi$p == "< .001", travel_taxi$p, str_sub(travel_taxi$p, 2))
+travel_taxi[is.na(travel_taxi)] <- ""
+
+kable(travel_taxi, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Likelihood of Taking a Taxi in the Next 14 Days", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+**Engagement in Pandemic-Related Safety Behaviors**
+
+```{r wash_hands_sanitizer}
+wash_hands_sanitizer.rf <- lm(wash_hands_sanitizer ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+wash_hands_sanitizer <- broom::tidy(wash_hands_sanitizer.rf)
+wash_hands_sanitizer <- rename(wash_hands_sanitizer, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+wash_hands_sanitizer$` ` <- dplyr::case_when(wash_hands_sanitizer$p < .001 ~ "***",
+                             wash_hands_sanitizer$p < .01 ~ "**",
+                             wash_hands_sanitizer$p < .05 ~ "*",
+                             wash_hands_sanitizer$p < .1 ~ "†",
+                             wash_hands_sanitizer$p < 1 ~ " ")
+wash_hands_sanitizer$Estimate <- round(wash_hands_sanitizer$Estimate, digits = 2)
+wash_hands_sanitizer$SE <- round(wash_hands_sanitizer$SE, digits = 2)
+wash_hands_sanitizer$t <- round(wash_hands_sanitizer$t, digits = 2)
+wash_hands_sanitizer$p <- round(wash_hands_sanitizer$p, digits = 3)
+wash_hands_sanitizer$Predictor[wash_hands_sanitizer$Predictor == "(Intercept)"] <- "Intercept"
+wash_hands_sanitizer$Predictor[wash_hands_sanitizer$Predictor == "prom"] <- "Promotion Pride"
+wash_hands_sanitizer$Predictor[wash_hands_sanitizer$Predictor == "prev"] <- "Prevention Pride"
+wash_hands_sanitizer$Predictor[wash_hands_sanitizer$Predictor == "agegroup.num.c"] <- "Age Group"
+wash_hands_sanitizer$Predictor[wash_hands_sanitizer$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+wash_hands_sanitizer$p <- as.character(wash_hands_sanitizer$p)
+wash_hands_sanitizer$p[wash_hands_sanitizer$p == "0"] <- "< .001"
+wash_hands_sanitizer$p <- ifelse(wash_hands_sanitizer$p == "< .001", wash_hands_sanitizer$p, str_sub(wash_hands_sanitizer$p, 2))
+wash_hands_sanitizer[is.na(wash_hands_sanitizer)] <- ""
+
+kable(wash_hands_sanitizer, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Washing Hands or Uses Hand Sanitizer Upon Returning Home", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r wear_mask_self_family}
+wear_mask_self_family.rf <- lm(wear_mask_self_family ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+wear_mask_self_family <- broom::tidy(wear_mask_self_family.rf)
+wear_mask_self_family <- rename(wear_mask_self_family, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+wear_mask_self_family$` ` <- dplyr::case_when(wear_mask_self_family$p < .001 ~ "***",
+                             wear_mask_self_family$p < .01 ~ "**",
+                             wear_mask_self_family$p < .05 ~ "*",
+                             wear_mask_self_family$p < .1 ~ "†",
+                             wear_mask_self_family$p < 1 ~ " ")
+wear_mask_self_family$Estimate <- round(wear_mask_self_family$Estimate, digits = 2)
+wear_mask_self_family$SE <- round(wear_mask_self_family$SE, digits = 2)
+wear_mask_self_family$t <- round(wear_mask_self_family$t, digits = 2)
+wear_mask_self_family$p <- round(wear_mask_self_family$p, digits = 3)
+wear_mask_self_family$Predictor[wear_mask_self_family$Predictor == "(Intercept)"] <- "Intercept"
+wear_mask_self_family$Predictor[wear_mask_self_family$Predictor == "prom"] <- "Promotion Pride"
+wear_mask_self_family$Predictor[wear_mask_self_family$Predictor == "prev"] <- "Prevention Pride"
+wear_mask_self_family$Predictor[wear_mask_self_family$Predictor == "agegroup.num.c"] <- "Age Group"
+wear_mask_self_family$Predictor[wear_mask_self_family$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+wear_mask_self_family$p <- as.character(wear_mask_self_family$p)
+wear_mask_self_family$p[wear_mask_self_family$p == "0"] <- "< .001"
+wear_mask_self_family$p <- ifelse(wear_mask_self_family$p == "< .001", wear_mask_self_family$p, str_sub(wear_mask_self_family$p, 2))
+wear_mask_self_family[is.na(wear_mask_self_family)] <- ""
+
+kable(wear_mask_self_family, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Wearing Masks When Leaving One's House to Protect Oneself and One's Family", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r wear_mask_others}
+wear_mask_others.rf <- lm(wear_mask_others ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+wear_mask_others <- broom::tidy(wear_mask_others.rf)
+wear_mask_others <- rename(wear_mask_others, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+wear_mask_others$` ` <- dplyr::case_when(wear_mask_others$p < .001 ~ "***",
+                             wear_mask_others$p < .01 ~ "**",
+                             wear_mask_others$p < .05 ~ "*",
+                             wear_mask_others$p < .1 ~ "†",
+                             wear_mask_others$p < 1 ~ " ")
+wear_mask_others$Estimate <- round(wear_mask_others$Estimate, digits = 2)
+wear_mask_others$SE <- round(wear_mask_others$SE, digits = 2)
+wear_mask_others$t <- round(wear_mask_others$t, digits = 2)
+wear_mask_others$p <- round(wear_mask_others$p, digits = 3)
+wear_mask_others$Predictor[wear_mask_others$Predictor == "(Intercept)"] <- "Intercept"
+wear_mask_others$Predictor[wear_mask_others$Predictor == "prom"] <- "Promotion Pride"
+wear_mask_others$Predictor[wear_mask_others$Predictor == "prev"] <- "Prevention Pride"
+wear_mask_others$Predictor[wear_mask_others$Predictor == "agegroup.num.c"] <- "Age Group"
+wear_mask_others$Predictor[wear_mask_others$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+wear_mask_others$p <- as.character(wear_mask_others$p)
+wear_mask_others$p[wear_mask_others$p == "0"] <- "< .001"
+wear_mask_others$p <- ifelse(wear_mask_others$p == "< .001", wear_mask_others$p, str_sub(wear_mask_others$p, 2))
+wear_mask_others[is.na(wear_mask_others)] <- ""
+
+kable(wear_mask_others, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Wearing Masks When Leaving One's House to Protect Others", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r wear_gloves}
+wear_gloves.rf <- lm(wear_gloves ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+wear_gloves <- broom::tidy(wear_gloves.rf)
+wear_gloves <- rename(wear_gloves, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+wear_gloves$` ` <- dplyr::case_when(wear_gloves$p < .001 ~ "***",
+                             wear_gloves$p < .01 ~ "**",
+                             wear_gloves$p < .05 ~ "*",
+                             wear_gloves$p < .1 ~ "†",
+                             wear_gloves$p < 1 ~ " ")
+wear_gloves$Estimate <- round(wear_gloves$Estimate, digits = 2)
+wear_gloves$SE <- round(wear_gloves$SE, digits = 2)
+wear_gloves$t <- round(wear_gloves$t, digits = 2)
+wear_gloves$p <- round(wear_gloves$p, digits = 3)
+wear_gloves$Predictor[wear_gloves$Predictor == "(Intercept)"] <- "Intercept"
+wear_gloves$Predictor[wear_gloves$Predictor == "prom"] <- "Promotion Pride"
+wear_gloves$Predictor[wear_gloves$Predictor == "prev"] <- "Prevention Pride"
+wear_gloves$Predictor[wear_gloves$Predictor == "agegroup.num.c"] <- "Age Group"
+wear_gloves$Predictor[wear_gloves$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+wear_gloves$p <- as.character(wear_gloves$p)
+wear_gloves$p[wear_gloves$p == "0"] <- "< .001"
+wear_gloves$p <- ifelse(wear_gloves$p == "< .001", wear_gloves$p, str_sub(wear_gloves$p, 2))
+wear_gloves[is.na(wear_gloves)] <- ""
+
+kable(wear_gloves, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Wearing Gloves When Leaving One's House", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r avoid_places_no_socdist}
+avoid_places_no_socdist.rf <- lm(avoid_places_no_socdist ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+avoid_places_no_socdist <- broom::tidy(avoid_places_no_socdist.rf)
+avoid_places_no_socdist <- rename(avoid_places_no_socdist, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+avoid_places_no_socdist$` ` <- dplyr::case_when(avoid_places_no_socdist$p < .001 ~ "***",
+                             avoid_places_no_socdist$p < .01 ~ "**",
+                             avoid_places_no_socdist$p < .05 ~ "*",
+                             avoid_places_no_socdist$p < .1 ~ "†",
+                             avoid_places_no_socdist$p < 1 ~ " ")
+avoid_places_no_socdist$Estimate <- round(avoid_places_no_socdist$Estimate, digits = 2)
+avoid_places_no_socdist$SE <- round(avoid_places_no_socdist$SE, digits = 2)
+avoid_places_no_socdist$t <- round(avoid_places_no_socdist$t, digits = 2)
+avoid_places_no_socdist$p <- round(avoid_places_no_socdist$p, digits = 3)
+avoid_places_no_socdist$Predictor[avoid_places_no_socdist$Predictor == "(Intercept)"] <- "Intercept"
+avoid_places_no_socdist$Predictor[avoid_places_no_socdist$Predictor == "prom"] <- "Promotion Pride"
+avoid_places_no_socdist$Predictor[avoid_places_no_socdist$Predictor == "prev"] <- "Prevention Pride"
+avoid_places_no_socdist$Predictor[avoid_places_no_socdist$Predictor == "agegroup.num.c"] <- "Age Group"
+avoid_places_no_socdist$Predictor[avoid_places_no_socdist$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+avoid_places_no_socdist$p <- as.character(avoid_places_no_socdist$p)
+avoid_places_no_socdist$p[avoid_places_no_socdist$p == "0"] <- "< .001"
+avoid_places_no_socdist$p <- ifelse(avoid_places_no_socdist$p == "< .001", avoid_places_no_socdist$p, str_sub(avoid_places_no_socdist$p, 2))
+avoid_places_no_socdist[is.na(avoid_places_no_socdist)] <- ""
+
+kable(avoid_places_no_socdist, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Avoiding Going to Places that Do Not Enforce Social Distancing", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r clean_disinfect}
+clean_disinfect.rf <- lm(clean_disinfect ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+clean_disinfect <- broom::tidy(clean_disinfect.rf)
+clean_disinfect <- rename(clean_disinfect, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+clean_disinfect$` ` <- dplyr::case_when(clean_disinfect$p < .001 ~ "***",
+                             clean_disinfect$p < .01 ~ "**",
+                             clean_disinfect$p < .05 ~ "*",
+                             clean_disinfect$p < .1 ~ "†",
+                             clean_disinfect$p < 1 ~ " ")
+clean_disinfect$Estimate <- round(clean_disinfect$Estimate, digits = 2)
+clean_disinfect$SE <- round(clean_disinfect$SE, digits = 2)
+clean_disinfect$t <- round(clean_disinfect$t, digits = 2)
+clean_disinfect$p <- round(clean_disinfect$p, digits = 3)
+clean_disinfect$Predictor[clean_disinfect$Predictor == "(Intercept)"] <- "Intercept"
+clean_disinfect$Predictor[clean_disinfect$Predictor == "prom"] <- "Promotion Pride"
+clean_disinfect$Predictor[clean_disinfect$Predictor == "prev"] <- "Prevention Pride"
+clean_disinfect$Predictor[clean_disinfect$Predictor == "agegroup.num.c"] <- "Age Group"
+clean_disinfect$Predictor[clean_disinfect$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+clean_disinfect$p <- as.character(clean_disinfect$p)
+clean_disinfect$p[clean_disinfect$p == "0"] <- "< .001"
+clean_disinfect$p <- ifelse(clean_disinfect$p == "< .001", clean_disinfect$p, str_sub(clean_disinfect$p, 2))
+clean_disinfect[is.na(clean_disinfect)] <- ""
+
+kable(clean_disinfect, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting Regularly Cleaning and Disinfecting One's Home", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+**Perceived Covid-19 Threat Level**
+
+```{r covid_threat_personal}
+covid_threat_personal.rf <- lm(covid_threat_personal ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+covid_threat_personal <- broom::tidy(covid_threat_personal.rf)
+covid_threat_personal <- rename(covid_threat_personal, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+covid_threat_personal$` ` <- dplyr::case_when(covid_threat_personal$p < .001 ~ "***",
+                             covid_threat_personal$p < .01 ~ "**",
+                             covid_threat_personal$p < .05 ~ "*",
+                             covid_threat_personal$p < .1 ~ "†",
+                             covid_threat_personal$p < 1 ~ " ")
+covid_threat_personal$Estimate <- round(covid_threat_personal$Estimate, digits = 2)
+covid_threat_personal$SE <- round(covid_threat_personal$SE, digits = 2)
+covid_threat_personal$t <- round(covid_threat_personal$t, digits = 2)
+covid_threat_personal$p <- round(covid_threat_personal$p, digits = 3)
+covid_threat_personal$Predictor[covid_threat_personal$Predictor == "(Intercept)"] <- "Intercept"
+covid_threat_personal$Predictor[covid_threat_personal$Predictor == "prom"] <- "Promotion Pride"
+covid_threat_personal$Predictor[covid_threat_personal$Predictor == "prev"] <- "Prevention Pride"
+covid_threat_personal$Predictor[covid_threat_personal$Predictor == "agegroup.num.c"] <- "Age Group"
+covid_threat_personal$Predictor[covid_threat_personal$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+covid_threat_personal$p <- as.character(covid_threat_personal$p)
+covid_threat_personal$p[covid_threat_personal$p == "0"] <- "< .001"
+covid_threat_personal$p <- ifelse(covid_threat_personal$p == "< .001", covid_threat_personal$p, str_sub(covid_threat_personal$p, 2))
+covid_threat_personal[is.na(covid_threat_personal)] <- ""
+
+kable(covid_threat_personal, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Level of Threat Covid-19 Poses to One Personally", align='lrrrr') %>%
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+```{r covid_threat_peers}
+covid_threat_peers.rf <- lm(covid_threat_peers ~ prom + prev + agegroup.num.c + pol_orient.num.c, data = rf)
+
+covid_threat_peers <- broom::tidy(covid_threat_peers.rf)
+covid_threat_peers <- rename(covid_threat_peers, Predictor = term, Estimate = estimate, SE = std.error, t = statistic, p = p.value)
+covid_threat_peers$` ` <- dplyr::case_when(covid_threat_peers$p < .001 ~ "***",
+                             covid_threat_peers$p < .01 ~ "**",
+                             covid_threat_peers$p < .05 ~ "*",
+                             covid_threat_peers$p < .1 ~ "†",
+                             covid_threat_peers$p < 1 ~ " ")
+covid_threat_peers$Estimate <- round(covid_threat_peers$Estimate, digits = 2)
+covid_threat_peers$SE <- round(covid_threat_peers$SE, digits = 2)
+covid_threat_peers$t <- round(covid_threat_peers$t, digits = 2)
+covid_threat_peers$p <- round(covid_threat_peers$p, digits = 3)
+covid_threat_peers$Predictor[covid_threat_peers$Predictor == "(Intercept)"] <- "Intercept"
+covid_threat_peers$Predictor[covid_threat_peers$Predictor == "prom"] <- "Promotion Pride"
+covid_threat_peers$Predictor[covid_threat_peers$Predictor == "prev"] <- "Prevention Pride"
+covid_threat_peers$Predictor[covid_threat_peers$Predictor == "agegroup.num.c"] <- "Age Group"
+covid_threat_peers$Predictor[covid_threat_peers$Predictor == "pol_orient.num.c"] <- "Political Orientation"
+covid_threat_peers$p <- as.character(covid_threat_peers$p)
+covid_threat_peers$p[covid_threat_peers$p == "0"] <- "< .001"
+covid_threat_peers$p <- ifelse(covid_threat_peers$p == "< .001", covid_threat_peers$p, str_sub(covid_threat_peers$p, 2))
+covid_threat_peers[is.na(covid_threat_peers)] <- ""
+
+kable(covid_threat_peers, "latex", booktabs = TRUE, caption = "Parameter Estimates from Multiple Regression Analysis Predicting the Level of Threat Covid-19 Poses to Most of One's Peers", align='lrrrr') %>%
   kable_styling(latex_options = c("HOLD_position"))
 ```
 
